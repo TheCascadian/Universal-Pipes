@@ -34,7 +34,7 @@ public final class ClientSetup {
 
     @SubscribeEvent
     public static void onItemColors(RegisterColorHandlersEvent.Item event) {
-        event.register((stack, tintIndex) -> tintIndex == 0 ? color(1) : NO_TINT, RegistryHandler.PIPE_ITEM.get());
+        event.register((stack, tintIndex) -> tintIndex == 0 ? color(stack.getOrDefault(RegistryHandler.TIER_COMPONENT.get(), 1)) : NO_TINT, RegistryHandler.PIPE_ITEM.get());
     }
 
     private static int color(int tier) {

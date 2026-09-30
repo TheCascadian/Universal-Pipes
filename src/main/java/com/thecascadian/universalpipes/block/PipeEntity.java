@@ -80,6 +80,7 @@ public class PipeEntity extends BlockEntity {
     private static final double NANOS_PER_MILLI = 1_000_000.0;
 
     private int disabledMask;
+    private boolean registered;
     private final Map<Direction, EndpointConfig> faces = new EnumMap<>(Direction.class);
     private final Map<Direction, Runtime> runtimes = new EnumMap<>(Direction.class);
 
@@ -219,20 +220,29 @@ public class PipeEntity extends BlockEntity {
     @Override
     public void onLoad() {
         super.onLoad();
-        if (level != null && !level.isClientSide)
+        register();
+    }
+
+    private void register() {
+        if (!registered && level != null && !level.isClientSide) {
             PipeNetworks.state(level).endpoints().add(this);
+            registered = true;
+        }
     }
 
     @Override
     public void setRemoved() {
         super.setRemoved();
-        if (level != null && !level.isClientSide)
+        if (registered && level != null) {
             PipeNetworks.state(level).endpoints().remove(this);
+            registered = false;
+        }
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, PipeEntity pipe) {
         if (pipe.faces.isEmpty() || !(level instanceof ServerLevel server))
             return;
+        pipe.register();
         long now = level.getGameTime();
         for (Map.Entry<Direction, EndpointConfig> entry : pipe.faces.entrySet()) {
             Runtime runtime = pipe.runtimes.get(entry.getKey());

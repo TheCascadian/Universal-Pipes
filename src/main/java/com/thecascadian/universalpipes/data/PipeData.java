@@ -27,8 +27,6 @@ import java.util.Map;
 public final class PipeData extends SimpleJsonResourceReloadListener {
 
     public static final int TIER_COUNT = 5;
-    public static final PipeData LISTENER = new PipeData();
-
     private static final Gson GSON = new GsonBuilder().create();
     private static final String DIRECTORY = "universal_pipes";
     private static final String TIERS = "tiers";
@@ -58,6 +56,8 @@ public final class PipeData extends SimpleJsonResourceReloadListener {
     private static final int DEFAULT_STOCK_CAP = 1_000_000;
 
     private static volatile Snapshot current = Snapshot.parse(new JsonObject());
+
+    public static final PipeData LISTENER = new PipeData();
 
     public record TierSpec(int itemsPerOp, int intervalTicks, int fluidPerOp, int energyPerTick, int filterSlots,
             int maxRules) {
