@@ -1,0 +1,6 @@
+{
+    "parent": "minecraft:item/handheld",
+    "textures": {
+        "layer0": "universal_pipes:item/pipe_upgrade"
+    }
+}

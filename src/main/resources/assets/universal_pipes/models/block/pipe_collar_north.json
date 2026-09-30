@@ -1,0 +1,46 @@
+{
+    "textures": {
+        "pipe": "universal_pipes:block/pipe",
+        "particle": "universal_pipes:block/pipe"
+    },
+    "elements": [
+        {
+            "from": [
+                4,
+                4,
+                0
+            ],
+            "to": [
+                12,
+                12,
+                2
+            ],
+            "faces": {
+                "north": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                },
+                "south": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                },
+                "east": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                },
+                "west": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                },
+                "up": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                },
+                "down": {
+                    "texture": "#pipe",
+                    "tintindex": 0
+                }
+            }
+        }
+    ]
+}

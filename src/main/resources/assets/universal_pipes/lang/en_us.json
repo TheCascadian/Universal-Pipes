@@ -1,0 +1,6 @@
+{
+    "block.universal_pipes.pipe": "Pipe",
+    "item.universal_pipes.pipe_wrench": "Pipe Wrench",
+    "item.universal_pipes.pipe_upgrade": "Pipe Upgrade",
+    "itemGroup.universal_pipes": "Universal Pipes"
+}

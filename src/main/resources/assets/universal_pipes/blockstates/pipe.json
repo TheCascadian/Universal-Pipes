@@ -1,0 +1,147 @@
+{
+    "multipart": [
+        {
+            "apply": {
+                "model": "universal_pipes:block/pipe_core"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "north": "connected"
+                    },
+                    {
+                        "north": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_north"
+            }
+        },
+        {
+            "when": {
+                "north": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_north"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "south": "connected"
+                    },
+                    {
+                        "south": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_south"
+            }
+        },
+        {
+            "when": {
+                "south": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_south"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "west": "connected"
+                    },
+                    {
+                        "west": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_west"
+            }
+        },
+        {
+            "when": {
+                "west": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_west"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "east": "connected"
+                    },
+                    {
+                        "east": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_east"
+            }
+        },
+        {
+            "when": {
+                "east": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_east"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "down": "connected"
+                    },
+                    {
+                        "down": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_down"
+            }
+        },
+        {
+            "when": {
+                "down": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_down"
+            }
+        },
+        {
+            "when": {
+                "OR": [
+                    {
+                        "up": "connected"
+                    },
+                    {
+                        "up": "endpoint"
+                    }
+                ]
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_arm_up"
+            }
+        },
+        {
+            "when": {
+                "up": "endpoint"
+            },
+            "apply": {
+                "model": "universal_pipes:block/pipe_collar_up"
+            }
+        }
+    ]
+}
