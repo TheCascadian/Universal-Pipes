@@ -8,6 +8,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
 /** Pipe textures are grayscale; the tier picks a vanilla map colour as the tint. */
 @EventBusSubscriber(modid = UniversalPipes.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
@@ -18,6 +19,11 @@ public final class ClientSetup {
     private static final int NO_TINT = -1;
 
     private ClientSetup() {
+    }
+
+    @SubscribeEvent
+    public static void onScreens(RegisterMenuScreensEvent event) {
+        event.register(RegistryHandler.PIPE_MENU.get(), PipeScreen::new);
     }
 
     @SubscribeEvent

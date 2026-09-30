@@ -1,0 +1,7 @@
+{
+    "redstone": "ignore",
+    "distribution": "round_robin",
+    "items": true,
+    "fluids": false,
+    "energy": false
+}

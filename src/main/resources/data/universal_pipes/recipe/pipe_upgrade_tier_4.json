@@ -1,0 +1,23 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": [
+        " I ",
+        "IRI",
+        " I "
+    ],
+    "key": {
+        "I": {
+            "tag": "c:ingots/netherite"
+        },
+        "R": {
+            "item": "minecraft:redstone"
+        }
+    },
+    "result": {
+        "id": "universal_pipes:pipe_upgrade",
+        "components": {
+            "universal_pipes:tier": 4
+        }
+    }
+}

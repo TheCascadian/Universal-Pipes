@@ -41,6 +41,23 @@ def pipe():
     return image
 
 
+PANEL = (198, 198, 198)
+SLOT_FILL = (139, 139, 139)
+SLOT_LIGHT = (255, 255, 255)
+SLOT_DARK = (55, 55, 55)
+
+
+def bevel(size, fill, light, dark):
+    """Flat fill with a one pixel light edge top left and dark edge bottom right."""
+    image = Image.new("RGBA", (size, size), rgba(fill))
+    for i in range(size):
+        image.putpixel((i, 0), rgba(dark if fill == SLOT_FILL else light))
+        image.putpixel((0, i), rgba(dark if fill == SLOT_FILL else light))
+        image.putpixel((i, size - 1), rgba(light if fill == SLOT_FILL else dark))
+        image.putpixel((size - 1, i), rgba(light if fill == SLOT_FILL else dark))
+    return image
+
+
 def blank():
     return Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
 
@@ -83,6 +100,9 @@ def main():
     save(pipe(), ASSETS / "block" / "pipe.png")
     save(wrench(), ASSETS / "item" / "pipe_wrench.png")
     save(upgrade(), ASSETS / "item" / "pipe_upgrade.png")
+    sprites = ASSETS / "gui" / "sprites"
+    save(bevel(16, PANEL, SLOT_LIGHT, SLOT_DARK), sprites / "panel.png")
+    save(bevel(18, SLOT_FILL, SLOT_LIGHT, SLOT_DARK), sprites / "slot.png")
 
 
 if __name__ == "__main__":
