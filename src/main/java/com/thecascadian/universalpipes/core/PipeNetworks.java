@@ -139,7 +139,10 @@ public final class PipeNetworks {
      * until a later topology change finds it.
      */
     public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch) {
-        int max = PipesConfig.maxNetworkNodes();
+        return discover(level, start, sourceFace, epoch, PipesConfig.maxNetworkNodes());
+    }
+
+    public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch, int max) {
         Long2IntOpenHashMap distance = new Long2IntOpenHashMap();
         distance.defaultReturnValue(-1);
         LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
