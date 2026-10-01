@@ -1,6 +1,8 @@
 package com.thecascadian.universalpipes.menu;
 
 import com.thecascadian.universalpipes.block.PipeEntity;
+import com.thecascadian.universalpipes.config.PipesConfig;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.Status;
 import com.thecascadian.universalpipes.registry.RegistryHandler;
@@ -47,19 +49,23 @@ public class PipeMenu extends AbstractContainerMenu {
     private final List<BlockPos> destinations;
     private final PipeEntity pipe;
     private EndpointConfig config;
+    private Appearance appearance;
 
     public PipeMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf buf) {
         this(containerId, inventory, buf.readBlockPos(), buf.readEnum(Direction.class), buf.readVarInt(),
-                EndpointConfig.STREAM_CODEC.decode(buf), readDestinations(buf), null, new SimpleContainerData(1));
+                EndpointConfig.STREAM_CODEC.decode(buf), Appearance.STREAM_CODEC.decode(buf), readDestinations(buf), null,
+                new SimpleContainerData(1));
     }
 
     private PipeMenu(int containerId, Inventory inventory, BlockPos pos, Direction face, int tier,
-            EndpointConfig config, List<BlockPos> destinations, PipeEntity pipe, ContainerData data) {
+            EndpointConfig config, Appearance appearance, List<BlockPos> destinations, PipeEntity pipe,
+            ContainerData data) {
         super(RegistryHandler.PIPE_MENU.get(), containerId);
         this.pos = pos;
         this.face = face;
         this.tier = tier;
         this.config = config;
+        this.appearance = appearance;
         this.destinations = destinations;
         this.pipe = pipe;
         this.data = data;
@@ -103,12 +109,13 @@ public class PipeMenu extends AbstractContainerMenu {
         };
         player.openMenu(
                 new SimpleMenuProvider((id, inventory, unused) -> new PipeMenu(id, inventory, pipe.getBlockPos(), face,
-                        pipe.tier(), config, shown, pipe, data), Component.translatable("block.universal_pipes.pipe")),
+                        pipe.tier(), config, pipe.appearance(), shown, pipe, data), Component.translatable("block.universal_pipes.pipe")),
                 buf -> {
                     buf.writeBlockPos(pipe.getBlockPos());
                     buf.writeEnum(face);
                     buf.writeVarInt(pipe.tier());
                     EndpointConfig.STREAM_CODEC.encode(buf, config);
+                    Appearance.STREAM_CODEC.encode(buf, pipe.appearance());
                     buf.writeVarInt(shown.size());
                     shown.forEach(buf::writeBlockPos);
                 });
@@ -130,6 +137,10 @@ public class PipeMenu extends AbstractContainerMenu {
         return config;
     }
 
+    public Appearance appearance() {
+        return appearance;
+    }
+
     public List<BlockPos> destinations() {
         return destinations;
     }
@@ -138,12 +149,14 @@ public class PipeMenu extends AbstractContainerMenu {
         return Status.byOrdinal(data.get(0));
     }
 
-    /** Server side: sanitizes a received configuration against the tier's limits before applying it. */
-    public void apply(EndpointConfig incoming) {
+    /** Server side: sanitizes a received configuration and look before applying them. */
+    public void apply(EndpointConfig incoming, Appearance look) {
         if (pipe == null)
             return;
         config = incoming.sanitize(tier);
+        appearance = look.sanitize(PipesConfig.glowAllowed());
         pipe.updateConfig(face, config);
+        pipe.setAppearance(appearance);
     }
 
     @Override

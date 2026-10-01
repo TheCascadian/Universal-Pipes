@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import com.thecascadian.universalpipes.UniversalPipes;
 import com.thecascadian.universalpipes.config.PipesConfig;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.Status;
 import com.thecascadian.universalpipes.core.TransportType;
@@ -25,6 +26,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
@@ -33,12 +36,14 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 /**
  * The one pipe screen: 176 pixels wide, 18 pixel slots, the standard inventory
- * position, extended in height only. Tabs choose the transport type, the two
- * view buttons choose between settings and filters. The client holds a working
+ * position, extended in height only. Tabs choose the transport type, the three
+ * view buttons choose between settings, filters and the look of the pipe. The client holds a working
  * copy of the configuration and sends the whole value after each edit; the
  * server sanitizes it and is the only authority.
  */
@@ -83,11 +88,26 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     private static final int ROW_ORDER = 147;
     private static final int PRESENT_LIMIT_SLACK = 6;
     private static final int CLIPBOARD_LIMIT = 12000;
+    private static final int ROW_PAINT = ROW_CONTENT;
+    private static final int ROW_SWATCH = 72;
+    private static final int ROW_MATERIAL = 112;
+    private static final int ROW_GLOW = 134;
+    private static final int ROW_RESET = 152;
+    private static final int SWATCH_SIZE = 16;
+    private static final int SWATCH_STEP = 20;
+    private static final int SWATCH_COLUMNS = 8;
+    private static final int MATERIAL_LABEL = 24;
+    private static final int OPAQUE = 0xFF000000;
+    private static final DyeColor[] DYES = DyeColor.values();
 
     private enum Picker { NONE, PRIORITY, SCOPE }
 
+    private enum View { SETTINGS, FILTERS, LOOK }
+
     private TransportType tab = TransportType.ITEM;
-    private boolean filtersView;
+    private View view = View.SETTINGS;
+    private boolean accentTarget;
+    private Appearance look;
     private Picker picker = Picker.NONE;
     private EndpointConfig config;
     private int selectedRule = -1;
@@ -101,6 +121,7 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         this.imageHeight = BASE_HEIGHT + PipeMenu.EXTENSION;
         this.inventoryLabelY = BASE_HEIGHT - 94 + PipeMenu.EXTENSION;
         this.config = menu.config();
+        this.look = menu.appearance();
     }
 
     @Override
@@ -120,7 +141,16 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
     private void edit(UnaryOperator<EndpointConfig> change) {
         config = change.apply(config);
-        PacketDistributor.sendToServer(new Payloads.ConfigUpdate(config));
+        send();
+    }
+
+    private void send() {
+        PacketDistributor.sendToServer(new Payloads.ConfigUpdate(config, look));
+    }
+
+    private void editLook(UnaryOperator<Appearance> change) {
+        look = change.apply(look);
+        send();
     }
 
     private void editTransport(UnaryOperator<EndpointConfig.Transport> change) {
@@ -133,6 +163,13 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
     private void rebuild() {
         clearWidgets();
+        addRenderableWidget(viewButton(View.SETTINGS, 0));
+        addRenderableWidget(viewButton(View.FILTERS, 1));
+        addRenderableWidget(viewButton(View.LOOK, 2));
+        if (view == View.LOOK) {
+            addLookWidgets();
+            return;
+        }
         for (TransportType type : TransportType.values()) {
             Button button = Button.builder(Component.translatable(type.translationKey()), pressed -> {
                 tab = type;
@@ -143,22 +180,86 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
             button.active = type != tab;
             addRenderableWidget(button);
         }
-        addRenderableWidget(viewButton("view.settings", LEFT, false));
-        addRenderableWidget(viewButton("view.filters", RIGHT, true));
-        if (filtersView)
+        if (view == View.FILTERS)
             addFilterWidgets();
         else
             addSettingWidgets();
     }
 
-    private Button viewButton(String key, int x, boolean filters) {
-        Button button = Button.builder(Component.translatable("gui." + UniversalPipes.MODID + "." + key), pressed -> {
-            filtersView = filters;
+    private Button viewButton(View target, int index) {
+        Button button = Button.builder(text("view." + target.name().toLowerCase(Locale.ROOT)), pressed -> {
+            view = target;
             picker = Picker.NONE;
             rebuild();
-        }).bounds(leftPos + x, topPos + ROW_VIEWS, HALF_WIDTH, BUTTON_HEIGHT).build();
-        button.active = filtersView != filters;
+        }).bounds(leftPos + LEFT + index * TAB_STEP, topPos + ROW_VIEWS, TAB_WIDTH, BUTTON_HEIGHT).build();
+        button.active = view != target;
         return button;
+    }
+
+    /** The look view: paint target, dye swatches, material slot and glow. The swatches and slot are drawn and hit-tested by hand. */
+    private void addLookWidgets() {
+        addRenderableWidget(CycleButton.onOffBuilder(accentTarget).create(leftPos + LEFT, topPos + ROW_PAINT, HALF_WIDTH,
+                BUTTON_HEIGHT + 2, text("paint"), (button, value) -> accentTarget = value));
+        addRenderableWidget(Button.builder(text("clear_color"), pressed -> editLook(
+                current -> accentTarget ? current.withAccent(Appearance.UNSET) : current.withTint(Appearance.UNSET)))
+                .bounds(leftPos + RIGHT, topPos + ROW_PAINT, HALF_WIDTH, BUTTON_HEIGHT).build());
+        addRenderableWidget(Button.builder(text("clear_material"), pressed -> editLook(
+                current -> current.withMaterial(Optional.empty())))
+                .bounds(leftPos + LEFT + MATERIAL_LABEL, topPos + ROW_MATERIAL + 2, FULL_WIDTH - MATERIAL_LABEL,
+                        BUTTON_HEIGHT).build());
+        addRenderableWidget(CycleButton.onOffBuilder(look.glow()).create(leftPos + LEFT, topPos + ROW_GLOW, FULL_WIDTH,
+                BUTTON_HEIGHT + 2, text("glow"), (button, value) -> editLook(current -> current.withGlow(value))));
+        addRenderableWidget(Button.builder(text("reset_look"), pressed -> {
+            editLook(current -> Appearance.NONE);
+            rebuild();
+        }).bounds(leftPos + LEFT, topPos + ROW_RESET, FULL_WIDTH, BUTTON_HEIGHT).build());
+    }
+
+    private int swatchX(int index) {
+        return leftPos + LEFT + (index % SWATCH_COLUMNS) * SWATCH_STEP;
+    }
+
+    private int swatchY(int index) {
+        return topPos + ROW_SWATCH + (index / SWATCH_COLUMNS) * SWATCH_STEP;
+    }
+
+    private static int rgb(DyeColor dye) {
+        return dye.getTextureDiffuseColor() & Appearance.RGB_MASK;
+    }
+
+    private boolean inside(double mouseX, double mouseY, int x, int y, int size) {
+        return mouseX >= x && mouseX < x + size && mouseY >= y && mouseY < y + size;
+    }
+
+    private boolean clickLook(double mouseX, double mouseY) {
+        for (int i = 0; i < DYES.length; i++) {
+            if (inside(mouseX, mouseY, swatchX(i), swatchY(i), SWATCH_SIZE)) {
+                int color = rgb(DYES[i]);
+                editLook(current -> accentTarget ? current.withAccent(color) : current.withTint(color));
+                return true;
+            }
+        }
+        if (!inside(mouseX, mouseY, leftPos + LEFT, topPos + ROW_MATERIAL, SLOT_SIZE)
+                || !(menu.getCarried().getItem() instanceof BlockItem block))
+            return false;
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block.getBlock());
+        if (Appearance.allowed(id))
+            editLook(current -> current.withMaterial(Optional.of(id)));
+        return true;
+    }
+
+    private void drawLook(GuiGraphics graphics) {
+        int selected = accentTarget ? look.accent() : look.tint();
+        for (int i = 0; i < DYES.length; i++) {
+            int x = swatchX(i);
+            int y = swatchY(i);
+            boolean chosen = selected == rgb(DYES[i]);
+            graphics.fill(x - 1, y - 1, x + SWATCH_SIZE + 1, y + SWATCH_SIZE + 1, chosen ? TITLE : MUTED);
+            graphics.fill(x, y, x + SWATCH_SIZE, y + SWATCH_SIZE, rgb(DYES[i]) | OPAQUE);
+        }
+        graphics.blitSprite(SLOT, leftPos + LEFT, topPos + ROW_MATERIAL, SLOT_SIZE, SLOT_SIZE);
+        look.material().map(BuiltInRegistries.BLOCK::get).ifPresent(block -> graphics.renderFakeItem(
+                new ItemStack(block), leftPos + LEFT + 1, topPos + ROW_MATERIAL + 1));
     }
 
     private void addSettingWidgets() {
@@ -380,16 +481,18 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     }
 
     private boolean simpleFilterShown() {
-        return filtersView && tab != TransportType.ENERGY && !config.transport(tab).filter().advanced();
+        return view == View.FILTERS && tab != TransportType.ENERGY && !config.transport(tab).filter().advanced();
     }
 
     private boolean advancedFilterShown() {
-        return filtersView && tab != TransportType.ENERGY && config.transport(tab).filter().advanced();
+        return view == View.FILTERS && tab != TransportType.ENERGY && config.transport(tab).filter().advanced();
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button))
+            return true;
+        if (view == View.LOOK && clickLook(mouseX, mouseY))
             return true;
         if (simpleFilterShown() && clickGhost(mouseX, mouseY, button))
             return true;
@@ -486,6 +589,8 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         graphics.blitSprite(PANEL, leftPos, topPos, imageWidth, imageHeight);
         for (Slot slot : menu.slots)
             graphics.blitSprite(SLOT, leftPos + slot.x - 1, topPos + slot.y - 1, SLOT_SIZE, SLOT_SIZE);
+        if (view == View.LOOK)
+            drawLook(graphics);
         if (simpleFilterShown())
             drawGhosts(graphics);
         if (picker != Picker.NONE)
@@ -547,9 +652,13 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(font, title, titleLabelX, titleLabelY, TITLE, true);
         graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, TITLE, true);
-        if (!filtersView && picker == Picker.PRIORITY) {
+        if (view == View.LOOK) {
+            look.material().map(BuiltInRegistries.BLOCK::get).ifPresentOrElse(
+                    block -> graphics.drawString(font, block.getName(), LEFT + SLOT_SIZE + 4, ROW_MATERIAL + 5, VALUE, true),
+                    () -> graphics.drawString(font, text("material"), LEFT + SLOT_SIZE + 4, ROW_MATERIAL + 5, SECONDARY, true));
+        } else if (view == View.SETTINGS && picker == Picker.PRIORITY) {
             graphics.drawString(font, text("order.hint"), LEFT, ROW_CONTENT + 4, SECONDARY, true);
-        } else if (!filtersView) {
+        } else if (view == View.SETTINGS) {
             graphics.drawString(font, text("keep"), LEFT, ROW_LABELS, SECONDARY, true);
             graphics.drawString(font, text("stop"), RIGHT, ROW_LABELS, SECONDARY, true);
             graphics.drawString(font, statusLine(), LEFT, ROW_STATUS, statusColor(), true);

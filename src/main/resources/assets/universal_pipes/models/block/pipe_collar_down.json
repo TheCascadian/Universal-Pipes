@@ -18,27 +18,27 @@
             "faces": {
                 "north": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 },
                 "south": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 },
                 "east": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 },
                 "west": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 },
                 "up": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 },
                 "down": {
                     "texture": "#pipe",
-                    "tintindex": 0
+                    "tintindex": 1
                 }
             }
         }

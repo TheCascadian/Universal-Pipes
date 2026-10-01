@@ -1,6 +1,7 @@
 package com.thecascadian.universalpipes.net;
 
 import com.thecascadian.universalpipes.UniversalPipes;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.data.PipeData;
 import com.thecascadian.universalpipes.menu.PipeMenu;
@@ -45,11 +46,12 @@ public final class Payloads {
         }
     }
 
-    public record ConfigUpdate(EndpointConfig config) implements CustomPacketPayload {
+    public record ConfigUpdate(EndpointConfig config, Appearance appearance) implements CustomPacketPayload {
         public static final Type<ConfigUpdate> TYPE = new Type<>(
                 ResourceLocation.fromNamespaceAndPath(UniversalPipes.MODID, "config_update"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ConfigUpdate> CODEC = StreamCodec.composite(
-                EndpointConfig.STREAM_CODEC, ConfigUpdate::config, ConfigUpdate::new);
+                EndpointConfig.STREAM_CODEC, ConfigUpdate::config, Appearance.STREAM_CODEC, ConfigUpdate::appearance,
+                ConfigUpdate::new);
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -106,7 +108,7 @@ public final class Payloads {
             if (last != null && now - last < MIN_TICKS_BETWEEN_UPDATES)
                 return;
             if (player.level().mayInteract(player, menu.pos()))
-                menu.apply(payload.config());
+                menu.apply(payload.config(), payload.appearance());
         });
     }
 }

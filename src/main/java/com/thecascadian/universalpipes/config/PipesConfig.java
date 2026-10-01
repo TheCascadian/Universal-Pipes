@@ -3,7 +3,7 @@ package com.thecascadian.universalpipes.config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Twelve scalars only. Everything tunable per tier or per feature lives in
+ * Thirteen scalars only. Everything tunable per tier or per feature lives in
  * reloadable datapack JSON instead, so servers can change it without a restart.
  * Reads fall back to the default while the spec is not yet loaded, which is the
  * case in GameTests and during early world setup.
@@ -48,6 +48,9 @@ public final class PipesConfig {
     private static final ModConfigSpec.BooleanValue TIER_SKIPPING = SERVER
             .comment("Allow a Pipe Upgrade to skip tiers. Live.")
             .define("allow_tier_skipping", true);
+    private static final ModConfigSpec.BooleanValue GLOW = SERVER
+            .comment("Allow pipes to be made luminous in the appearance tab. Live.")
+            .define("allow_glow", true);
     private static final ModConfigSpec.IntValue COMMAND_LEVEL = SERVER
             .comment("Permission level required for /upipes. Applies to commands registered after the next world load.")
             .defineInRange("command_permission_level", DEFAULT_COMMAND_LEVEL, 0, 4);
@@ -104,6 +107,10 @@ public final class PipesConfig {
 
     public static boolean tierSkipping() {
         return read(TIER_SKIPPING);
+    }
+
+    public static boolean glowAllowed() {
+        return read(GLOW);
     }
 
     public static int commandLevel() {

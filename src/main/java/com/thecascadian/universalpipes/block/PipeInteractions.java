@@ -2,6 +2,7 @@ package com.thecascadian.universalpipes.block;
 
 import com.thecascadian.universalpipes.UniversalPipes;
 import com.thecascadian.universalpipes.config.PipesConfig;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
 import com.thecascadian.universalpipes.core.Targets;
@@ -10,6 +11,7 @@ import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -19,7 +21,10 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.DyeItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -28,16 +33,18 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AnvilUpdateEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Wrench and upgrade behaviour. It is handled on the right click event rather
+ * Wrench, upgrade and styling behaviour. It is handled on the right click event rather
  * than in Item#useOn so that one code path serves this mod's wrench, any item in
  * the common wrench tag, and sneaking: the event fires before vanilla decides
  * whether a sneaking player's block interaction is skipped, which Item#useOn
@@ -50,6 +57,7 @@ public final class PipeInteractions {
     private static final TagKey<Item> WRENCH_TAG = TagKey.create(Registries.ITEM,
             ResourceLocation.fromNamespaceAndPath("c", "tools/wrench"));
     private static final int BREAK_EFFECT = 2001;
+    private static final int ANVIL_COST = 1;
     private static final int PARTICLE_COUNT = 3;
     private static final int PARTICLE_LIMIT = 16;
     private static final double PARTICLE_SPREAD = 0.25;
@@ -69,14 +77,17 @@ public final class PipeInteractions {
         ItemStack stack = event.getItemStack();
         boolean wrench = stack.is(RegistryHandler.PIPE_WRENCH.get()) || stack.is(WRENCH_TAG);
         boolean upgrade = stack.getItem() instanceof PipeUpgrade;
-        if (!wrench && !upgrade)
+        boolean dye = stack.getItem() instanceof DyeItem;
+        if (!wrench && !upgrade && !dye)
             return;
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
         Player player = event.getEntity();
         if (!(level instanceof ServerLevel server) || !level.mayInteract(player, pos))
             return;
-        if (wrench) {
+        if (dye) {
+            tint(server, pos, player, stack);
+        } else if (wrench) {
             if (player.isShiftKeyDown())
                 dismantle(server, pos, state, player);
             else
@@ -85,6 +96,59 @@ public final class PipeInteractions {
         } else {
             upgrade(server, pos, player, stack, player.isShiftKeyDown());
         }
+    }
+
+    /** Dyeing in place; it creates the block entity that carries the look and spends one dye. */
+    private static void tint(ServerLevel level, BlockPos pos, Player player, ItemStack stack) {
+        Appearance next = styled(appearanceAt(level, pos), stack);
+        if (next == null || next.equals(appearanceAt(level, pos)))
+            return;
+        PipeBlock.entityFor(level, pos).setAppearance(next);
+        consume(player, stack);
+    }
+
+    private static Appearance appearanceAt(ServerLevel level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe.appearance() : Appearance.NONE;
+    }
+
+    /**
+     * The appearance a given item applies, or null when it applies none. Dye sets
+     * the tint, a glow ink sac the glow, and a block from the material tag the
+     * material. All of them are vanilla items, so styling adds no item to the mod.
+     */
+    private static Appearance styled(Appearance base, ItemStack item) {
+        if (item.getItem() instanceof DyeItem dye)
+            return base.withTint(dye.getDyeColor().getTextureDiffuseColor() & Appearance.RGB_MASK);
+        if (item.is(Items.GLOW_INK_SAC))
+            return PipesConfig.glowAllowed() ? base.withGlow(true) : null;
+        if (item.getItem() instanceof BlockItem block) {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block.getBlock());
+            return Appearance.allowed(id) ? base.withMaterial(Optional.of(id)) : null;
+        }
+        return null;
+    }
+
+    /**
+     * Anvil styling covers a whole stack at one material per pipe, since the
+     * anvil always consumes the full left stack and a partial result would
+     * destroy the remainder.
+     */
+    @SubscribeEvent
+    public static void onAnvil(AnvilUpdateEvent event) {
+        ItemStack left = event.getLeft();
+        ItemStack right = event.getRight();
+        if (!left.is(RegistryHandler.PIPE_ITEM.get()) || right.getCount() < left.getCount())
+            return;
+        PipeEntity.Settings current = left.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS);
+        Appearance next = styled(current.appearance(), right);
+        if (next == null || next.equals(current.appearance()))
+            return;
+        ItemStack output = left.copy();
+        output.set(RegistryHandler.SETTINGS.get(),
+                new PipeEntity.Settings(current.disabledMask(), current.faces(), next));
+        event.setOutput(output);
+        event.setCost(ANVIL_COST);
+        event.setMaterialCost(left.getCount());
     }
 
     /** Connected, then disconnected, then extract, then connected again. */

@@ -61,5 +61,12 @@
     "gui.universal_pipes.status.destination_full": "Destination full",
     "gui.universal_pipes.status.redstone_off": "Redstone off",
     "gui.universal_pipes.status.unloaded_target": "Target not loaded",
-    "gui.universal_pipes.status.budget_deferred": "Deferred by tick budget"
+    "gui.universal_pipes.status.budget_deferred": "Deferred by tick budget",
+    "gui.universal_pipes.view.look": "Look",
+    "gui.universal_pipes.paint": "Paint",
+    "gui.universal_pipes.clear_color": "Clear color",
+    "gui.universal_pipes.clear_material": "Clear material",
+    "gui.universal_pipes.material": "Material",
+    "gui.universal_pipes.glow": "Glow",
+    "gui.universal_pipes.reset_look": "Reset look"
 }

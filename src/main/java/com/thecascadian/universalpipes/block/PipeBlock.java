@@ -10,6 +10,7 @@ import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -149,6 +150,25 @@ public class PipeBlock extends Block implements EntityBlock {
             pipe.wakeAll();
     }
 
+    /**
+     * A block without a block entity at placement never receives the item's
+     * components, so a pipe item carrying settings or an appearance is applied
+     * here, creating the entity only when the item actually holds state.
+     */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (level.isClientSide || !stack.has(RegistryHandler.SETTINGS.get()))
+            return;
+        entityFor(level, pos).applyComponents(stack.getComponents(), stack.getComponentsPatch());
+        refresh(level, pos);
+    }
+
+    @Override
+    public int getLightEmission(BlockState state, BlockGetter level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe.lightEmission() : 0;
+    }
+
     /** Creates or removes the block entity so that only pipes with state carry one. */
     public static void refresh(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
@@ -178,9 +198,22 @@ public class PipeBlock extends Block implements EntityBlock {
     @SuppressWarnings("unchecked")
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
             BlockEntityType<T> type) {
-        if (level.isClientSide || type != RegistryHandler.PIPE_ENTITY.get())
+        if (level.isClientSide || type != RegistryHandler.PIPE_ENTITY.get() || !hasEndpoint(state))
             return null;
         return (BlockEntityTicker<T>) (BlockEntityTicker<PipeEntity>) PipeEntity::serverTick;
+    }
+
+    /**
+     * A pipe that only carries an appearance has a block entity but no ticker:
+     * the ticker is chosen from the state, and the state shows an endpoint face
+     * exactly when the entity has something to run.
+     */
+    private static boolean hasEndpoint(BlockState state) {
+        for (EnumProperty<Connection> face : FACES.values()) {
+            if (state.getValue(face) == Connection.ENDPOINT)
+                return true;
+        }
+        return false;
     }
 
     @Override

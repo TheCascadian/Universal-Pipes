@@ -5,6 +5,7 @@ import com.thecascadian.universalpipes.block.Connection;
 import com.thecascadian.universalpipes.block.PipeBlock;
 import com.thecascadian.universalpipes.block.PipeEntity;
 import com.thecascadian.universalpipes.block.PipeInteractions;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
 import com.thecascadian.universalpipes.core.Status;
@@ -16,6 +17,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
@@ -28,6 +30,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * GameTests only; no JUnit. Covers transfer, remainder handling, filters,
@@ -171,6 +174,26 @@ public final class PipeGameTests {
             helper.fail("Block entity or extraction face was lost");
         else if (!pipe.config(Direction.WEST).items().filter().entries().equals(List.of("minecraft:dirt")))
             helper.fail("Filter was lost");
+        else
+            helper.succeed();
+    }
+
+    @GameTest(template = TEMPLATE)
+    public static void appearanceSurvivesDropAndIsSanitized(GameTestHelper helper) {
+        helper.setBlock(new BlockPos(2, 1, 1), pipeState(1));
+        BlockPos pos = helper.absolutePos(new BlockPos(2, 1, 1));
+        ServerLevel level = helper.getLevel();
+        ResourceLocation planks = ResourceLocation.withDefaultNamespace("oak_planks");
+        Appearance look = new Appearance(0xFF0000, Appearance.UNSET, Optional.of(planks), false);
+        PipeBlock.entityFor(level, pos).setAppearance(look);
+        ItemStack dropped = PipeBlock.dropsFor(level.getBlockState(pos), level.getBlockEntity(pos)).get(0);
+        Appearance kept = dropped.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS).appearance();
+        Appearance forged = new Appearance(-5, Appearance.UNSET, Optional.of(ResourceLocation.withDefaultNamespace("bedrock")),
+                true).sanitize(false);
+        if (!kept.equals(look))
+            helper.fail("Appearance was lost on drop");
+        else if (forged.material().isPresent() || forged.glow() || forged.tint() < 0)
+            helper.fail("Forged appearance was not sanitized");
         else
             helper.succeed();
     }

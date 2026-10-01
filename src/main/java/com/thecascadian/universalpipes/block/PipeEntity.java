@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.thecascadian.universalpipes.UniversalPipes;
 import com.thecascadian.universalpipes.config.PipesConfig;
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
 import com.thecascadian.universalpipes.core.Status;
@@ -18,12 +19,18 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
+import net.neoforged.neoforge.client.model.data.ModelData;
+import net.neoforged.neoforge.client.model.data.ModelProperty;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -45,13 +52,21 @@ import java.util.Map;
 public class PipeEntity extends BlockEntity {
 
     /** Persisted form, also the body of the data component. */
-    public record Settings(int disabledMask, Map<Direction, EndpointConfig> faces) {
+    public record Settings(int disabledMask, Map<Direction, EndpointConfig> faces, Appearance appearance) {
         public static final Codec<Settings> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("disabled", 0).forGetter(Settings::disabledMask),
                 Codec.unboundedMap(Direction.CODEC, EndpointConfig.CODEC).optionalFieldOf("faces", Map.of())
-                        .forGetter(Settings::faces))
+                        .forGetter(Settings::faces),
+                Appearance.CODEC.optionalFieldOf("appearance", Appearance.NONE).forGetter(Settings::appearance))
                 .apply(i, Settings::new));
     }
+
+    public static final Settings EMPTY_SETTINGS = new Settings(0, Map.of(), Appearance.NONE);
+
+    /** Read by the baked model wrapper to swap the sprite of a pipe that has a material. */
+    public static final ModelProperty<Appearance> APPEARANCE_PROPERTY = new ModelProperty<>();
+    private static final String APPEARANCE_KEY = "appearance";
+    private static final int GLOW_LIGHT = 7;
 
     /** Transient per face scheduling and cache state. */
     private static final class Runtime {
@@ -80,6 +95,7 @@ public class PipeEntity extends BlockEntity {
     private static final double NANOS_PER_MILLI = 1_000_000.0;
 
     private int disabledMask;
+    private Appearance appearance = Appearance.NONE;
     private boolean registered;
     private final Map<Direction, EndpointConfig> faces = new EnumMap<>(Direction.class);
     private final Map<Direction, Runtime> runtimes = new EnumMap<>(Direction.class);
@@ -107,7 +123,58 @@ public class PipeEntity extends BlockEntity {
     }
 
     public boolean isEmptyState() {
-        return disabledMask == 0 && faces.isEmpty();
+        return disabledMask == 0 && faces.isEmpty() && appearance.equals(Appearance.NONE);
+    }
+
+    public Appearance appearance() {
+        return appearance;
+    }
+
+    /**
+     * The look is mirrored to clients with a dedicated update tag, because the
+     * face configuration (filters included) is not needed for rendering. A light
+     * recheck is queued as well, as glow is read from the block entity.
+     */
+    public void setAppearance(Appearance value) {
+        if (appearance.equals(value))
+            return;
+        appearance = value;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+            level.getLightEngine().checkBlock(worldPosition);
+        }
+    }
+
+    public int lightEmission() {
+        return appearance.glow() ? GLOW_LIGHT : 0;
+    }
+
+    @Override
+    public ModelData getModelData() {
+        return ModelData.builder().with(APPEARANCE_PROPERTY, appearance).build();
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = new CompoundTag();
+        Appearance.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), appearance).result()
+                .ifPresent(encoded -> tag.put(APPEARANCE_KEY, encoded));
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        if (!tag.contains(APPEARANCE_KEY))
+            return;
+        Appearance.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get(APPEARANCE_KEY)).result()
+                .ifPresent(parsed -> appearance = parsed);
+        requestModelDataRefresh();
     }
 
     public EndpointConfig config(Direction face) {
@@ -178,13 +245,14 @@ public class PipeEntity extends BlockEntity {
     }
 
     public Settings settings() {
-        return new Settings(disabledMask, Map.copyOf(faces));
+        return new Settings(disabledMask, Map.copyOf(faces), appearance);
     }
 
     private void load(Settings settings) {
         disabledMask = settings.disabledMask();
         faces.clear();
         faces.putAll(settings.faces());
+        appearance = settings.appearance();
         runtimes.clear();
     }
 
