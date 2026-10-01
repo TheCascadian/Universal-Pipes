@@ -3,6 +3,7 @@ package com.thecascadian.universalpipes.registry;
 import com.mojang.serialization.Codec;
 import com.thecascadian.universalpipes.UniversalPipes;
 import com.thecascadian.universalpipes.block.PipeBlock;
+import com.thecascadian.universalpipes.item.GuideBookItem;
 import com.thecascadian.universalpipes.item.PipeUpgrade;
 import com.thecascadian.universalpipes.block.PipeEntity;
 import com.thecascadian.universalpipes.menu.PipeMenu;
@@ -29,7 +30,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.function.Supplier;
 
-/** The mod registers exactly three objects: Pipe (block and item), Pipe Wrench, Pipe Upgrade. */
+/** The mod registers four objects: Pipe (block and item), Pipe Wrench, Pipe Upgrade and the Pipes Guide. */
 public final class RegistryHandler {
 
     private static final float PIPE_HARDNESS = 1.5F;
@@ -63,6 +64,9 @@ public final class RegistryHandler {
     public static final DeferredItem<PipeUpgrade> PIPE_UPGRADE = ITEMS.register("pipe_upgrade",
             () -> new PipeUpgrade(new Item.Properties()));
 
+    public static final DeferredItem<GuideBookItem> GUIDE_BOOK = ITEMS.register("guide",
+            () -> new GuideBookItem(new Item.Properties().stacksTo(1)));
+
     public static final Supplier<DataComponentType<Integer>> TIER_COMPONENT = COMPONENTS.register("tier",
             () -> DataComponentType.<Integer>builder().persistent(Codec.intRange(1, PipeBlock.MAX_TIER))
                     .networkSynchronized(ByteBufCodecs.VAR_INT).build());
@@ -82,6 +86,7 @@ public final class RegistryHandler {
                     .displayItems((parameters, output) -> {
                         output.accept(PIPE_ITEM.get());
                         output.accept(PIPE_WRENCH.get());
+                        output.accept(GUIDE_BOOK.get());
                         for (int tier = 2; tier <= PipeBlock.MAX_TIER; tier++)
                             output.accept(PipeUpgrade.create(tier));
                     }).build());

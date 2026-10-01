@@ -5,7 +5,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.List;
 
 /**
- * Thirteen scalars only. Everything tunable per tier or per feature lives in
+ * Fourteen scalars only. Everything tunable per tier or per feature lives in
  * reloadable datapack JSON instead, so servers can change it without a restart.
  * Reads fall back to the default while the spec is not yet loaded, which is the
  * case in GameTests and during early world setup.
@@ -70,6 +70,9 @@ public final class PipesConfig {
     private static final ModConfigSpec.BooleanValue GLOW = SERVER
             .comment("Allow pipes to be made luminous in the appearance tab. Live.")
             .define("allow_glow", true);
+    private static final ModConfigSpec.BooleanValue GIVE_GUIDE = SERVER
+            .comment("Give every player one Pipes Guide book the first time they join a world. Live.")
+            .define("give_guide_on_first_join", true);
     private static final ModConfigSpec.IntValue COMMAND_LEVEL = SERVER
             .comment("Permission level required for /upipes. Applies to commands registered after the next world load.")
             .defineInRange("command_permission_level", DEFAULT_COMMAND_LEVEL, 0, 4);
@@ -90,6 +93,10 @@ public final class PipesConfig {
         } catch (IllegalStateException notLoaded) {
             return value.getDefault();
         }
+    }
+
+    public static boolean giveGuide() {
+        return read(GIVE_GUIDE);
     }
 
     public static boolean entityTargets() {

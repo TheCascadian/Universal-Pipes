@@ -32,9 +32,3 @@ versionRange="[19,)"
 ordering="NONE"
 side="CLIENT"
 
-[[dependencies.${mod_id}]]
-modId="patchouli"
-type="optional"
-versionRange="[1.21,)"
-ordering="NONE"
-side="BOTH"
