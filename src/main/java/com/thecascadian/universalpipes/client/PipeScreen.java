@@ -105,10 +105,11 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     private static final int SWATCH_SIZE = 16;
     private static final int SWATCH_STEP = 20;
     private static final int SWATCH_COLUMNS = 8;
-    private static final int LOOK_PAINT_Y = 78;
+    private static final int LOOK_PAINT_Y = 74;
     private static final int LOOK_MATERIAL_Y = 98;
     private static final int LOOK_GLOW_Y = 122;
     private static final int MATERIAL_LABEL = 22;
+    private static final int CAPTION_RISE = 9;
     private static final int CLEAR_WIDTH = 44;
     private static final DyeColor[] DYES = DyeColor.values();
 
@@ -568,22 +569,45 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         return false;
     }
 
-    /** Left click selects a rule; right click switches it on or off. */
+    /**
+     * Left click deletes a rule, which is the quick way to prune a list of items.
+     * Right click selects it for editing, and re-enables it if it was switched off,
+     * since the screen has no other control for that.
+     */
     private boolean clickRuleRow(double mouseX, double mouseY, int button) {
-        List<FilterSet.Rule> rules = config.transport(tab).filter().rules();
+        int index = ruleRowAt(mouseX, mouseY);
+        if (index < 0)
+            return false;
+        if (button == 0) {
+            List<FilterSet.Rule> rules = new ArrayList<>(config.transport(tab).filter().rules());
+            rules.remove(index);
+            if (selectedRule == index)
+                selectedRule = -1;
+            else if (selectedRule > index)
+                selectedRule--;
+            scroll = Math.max(0, Math.min(scroll, rules.size() - RULE_ROWS));
+            editFilter(f -> withRules(f, rules));
+        } else if (button == 1) {
+            if (!config.transport(tab).filter().rules().get(index).enabled())
+                updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(), r.limit(), true));
+            selectedRule = index;
+        } else {
+            return false;
+        }
+        rebuild();
+        return true;
+    }
+
+    private int ruleRowAt(double mouseX, double mouseY) {
+        int size = config.transport(tab).filter().rules().size();
         for (int row = 0; row < RULE_ROWS; row++) {
             int index = scroll + row;
             int rowY = y(ROW_3 + row * LIST_ROW_HEIGHT);
-            if (index >= rules.size() || mouseX < x(LEFT) || mouseX >= x(LEFT + FULL_WIDTH) || mouseY < rowY
-                    || mouseY >= rowY + LIST_ROW_HEIGHT)
-                continue;
-            if (button == 1)
-                updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(), r.limit(), !r.enabled()));
-            selectedRule = index;
-            rebuild();
-            return true;
+            if (index < size && mouseX >= x(LEFT) && mouseX < x(LEFT + FULL_WIDTH) && mouseY >= rowY
+                    && mouseY < rowY + LIST_ROW_HEIGHT)
+                return index;
         }
-        return false;
+        return -1;
     }
 
     private boolean clickDestination(double mouseX, double mouseY) {
@@ -721,7 +745,8 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
                     ROW_1 + TEXT_DROP, SECONDARY, false);
         } else if (view == View.LOOK) {
             Component name = look.material().map(BuiltInRegistries.BLOCK::get).map(block -> block.getName())
-                    .orElse(text("hint.material").copy());
+                    .orElse(text("none").copy());
+            graphics.drawString(font, text("material.caption"), LEFT, LOOK_MATERIAL_Y - CAPTION_RISE, SECONDARY, false);
             graphics.drawString(font, name, LEFT + MATERIAL_LABEL, LOOK_MATERIAL_Y + 5,
                     look.material().isPresent() ? TITLE : SECONDARY, false);
         } else if (view == View.FILTERS && tab == TransportType.ENERGY) {
@@ -753,6 +778,8 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
                     graphics.renderTooltip(font, displayStack(entries.get(i)), mouseX, mouseY);
             }
         }
+        if (advancedFilterShown() && ruleRowAt(mouseX, mouseY) >= 0)
+            graphics.renderTooltip(font, text("rule.hint"), mouseX, mouseY);
         renderTooltip(graphics, mouseX, mouseY);
     }
 }

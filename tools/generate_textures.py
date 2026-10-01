@@ -1,8 +1,8 @@
 """Generates the textures for Universal Pipes.
 
 Each tier has its own pipe texture and upgrade texture, distinguished by hue
-and by a pattern that survives dye tinting: stripe rows count the tier on the
-arms, and the upgrade chip carries one pip fewer than its tier number. Run from
+and by a pattern that survives dye tinting: the core face carries one corner
+mark per tier above the first, and the upgrade chip carries one pip fewer than its tier number. Run from
 the repository root:
 
     python tools/generate_textures.py
@@ -22,9 +22,11 @@ TIER_RAMPS = [
     [(214, 170, 255), (176, 120, 236), (134, 84, 196), (88, 48, 140)],
 ]
 TIER_ACCENTS = [(244, 244, 244), (255, 222, 170), (255, 255, 214), (230, 110, 70), (255, 255, 255)]
-ARM_BANDS = (range(0, 5), range(11, 16))
-STRIPE_ROWS = {1: (2,), 2: (1, 3), 3: (0, 2, 4), 4: (0, 1, 3, 4), 5: (0, 1, 2, 3, 4)}
-STUD = ((7, 7), (8, 7), (7, 8), (8, 8))
+BODY = (1, 1, 6)
+CORE = (1, 9, 6)
+COLLAR = (8, 1, 8)
+STUD = ((2, 2), (3, 2), (2, 3), (3, 3))
+CORNER_MARKS = ((0, 0), (5, 0), (0, 5), (5, 5))
 PIPS = ((5, 5), (9, 5), (5, 9), (9, 9))
 WRENCH_RAMP = [(214, 224, 232), (160, 176, 196), (112, 122, 160), (76, 70, 110), (52, 40, 72)]
 
@@ -43,17 +45,19 @@ def shaded(ramp, x, y, x0, y0, x1, y1):
 
 
 def pipe(tier):
+    """Three fixed regions, each addressed by the model UVs: body, core and collar."""
     ramp = TIER_RAMPS[tier - 1]
-    image = Image.new("RGBA", (SIZE, SIZE))
-    for y in range(SIZE):
-        for x in range(SIZE):
-            image.putpixel((x, y), rgba(shaded(ramp, x, y, 0, 0, SIZE - 1, SIZE - 1)))
-    for band in ARM_BANDS:
-        for row in STRIPE_ROWS[tier]:
-            for x in range(1, SIZE - 1):
-                image.putpixel((x, band.start + row), rgba(ramp[3]))
-    for x, y in STUD:
-        image.putpixel((x, y), rgba(TIER_ACCENTS[tier - 1]))
+    image = Image.new("RGBA", (SIZE, SIZE), rgba(ramp[2]))
+    for (x0, y0, size) in (BODY, CORE, COLLAR):
+        for y in range(y0, y0 + size):
+            for x in range(x0, x0 + size):
+                image.putpixel((x, y), rgba(shaded(ramp, x, y, x0, y0, x0 + size - 1, y0 + size - 1)))
+    for dx, dy in STUD:
+        image.putpixel((CORE[0] + dx, CORE[1] + dy), rgba(TIER_ACCENTS[tier - 1]))
+    for dx, dy in CORNER_MARKS[:tier - 1]:
+        # Contrast against the bevel: the dark edge takes a light mark, the light edges a dark one.
+        mark = ramp[0] if (dx, dy) == CORNER_MARKS[-1] else ramp[3]
+        image.putpixel((CORE[0] + dx, CORE[1] + dy), rgba(mark))
     return image
 
 

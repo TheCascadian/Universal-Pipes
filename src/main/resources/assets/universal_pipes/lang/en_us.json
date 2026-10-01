@@ -86,9 +86,11 @@
     "gui.universal_pipes.scope.tooltip": "Limit this rule to chosen targets",
     "gui.universal_pipes.scope.hint": "Click targets to choose them",
     "gui.universal_pipes.hint.add": "Click an item to add it",
-    "gui.universal_pipes.hint.material": "Click a block to use it",
     "gui.universal_pipes.count": "Entries: %s of %s",
     "gui.universal_pipes.paint.body": "Paint body",
     "gui.universal_pipes.paint.collar": "Paint collar",
-    "gui.universal_pipes.clear": "Clear"
+    "gui.universal_pipes.clear": "Clear",
+    "gui.universal_pipes.material.caption": "Material: click a block below",
+    "gui.universal_pipes.none": "None",
+    "gui.universal_pipes.rule.hint": "Click to delete, right click to edit"
 }
