@@ -1,7 +1,9 @@
 """Generates the textures for Universal Pipes.
 
-The pipe texture is grayscale so the client block and item colour handlers can
-tint it per tier. Run from the repository root:
+Each tier has its own pipe texture and upgrade texture, distinguished by hue
+and by a pattern that survives dye tinting: stripe rows count the tier on the
+arms, and the upgrade chip carries one pip fewer than its tier number. Run from
+the repository root:
 
     python tools/generate_textures.py
 """
@@ -12,9 +14,19 @@ from PIL import Image
 SIZE = 16
 ASSETS = Path("src/main/resources/assets/universal_pipes/textures")
 
-PIPE_RAMP = [(214, 214, 214), (178, 178, 178), (142, 142, 142), (106, 106, 106), (74, 74, 74)]
+TIER_RAMPS = [
+    [(206, 206, 206), (176, 176, 176), (146, 146, 146), (100, 100, 100)],
+    [(240, 170, 118), (214, 128, 82), (178, 96, 60), (118, 62, 44)],
+    [(255, 236, 130), (240, 200, 60), (204, 156, 32), (140, 100, 28)],
+    [(122, 104, 110), (90, 74, 80), (66, 52, 58), (40, 30, 36)],
+    [(214, 170, 255), (176, 120, 236), (134, 84, 196), (88, 48, 140)],
+]
+TIER_ACCENTS = [(244, 244, 244), (255, 222, 170), (255, 255, 214), (230, 110, 70), (255, 255, 255)]
+ARM_BANDS = (range(0, 5), range(11, 16))
+STRIPE_ROWS = {1: (2,), 2: (1, 3), 3: (0, 2, 4), 4: (0, 1, 3, 4), 5: (0, 1, 2, 3, 4)}
+STUD = ((7, 7), (8, 7), (7, 8), (8, 8))
+PIPS = ((5, 5), (9, 5), (5, 9), (9, 9))
 WRENCH_RAMP = [(214, 224, 232), (160, 176, 196), (112, 122, 160), (76, 70, 110), (52, 40, 72)]
-UPGRADE_RAMP = [(250, 226, 150), (232, 176, 84), (196, 120, 62), (140, 76, 60), (88, 48, 56)]
 
 
 def rgba(color):
@@ -30,14 +42,18 @@ def shaded(ramp, x, y, x0, y0, x1, y1):
     return ramp[1] if (x + y) % 7 else ramp[2]
 
 
-def pipe():
-    image = Image.new("RGBA", (SIZE, SIZE), rgba(PIPE_RAMP[4]))
+def pipe(tier):
+    ramp = TIER_RAMPS[tier - 1]
+    image = Image.new("RGBA", (SIZE, SIZE))
     for y in range(SIZE):
         for x in range(SIZE):
-            image.putpixel((x, y), rgba(shaded(PIPE_RAMP, x, y, 0, 0, SIZE - 1, SIZE - 1)))
-    for x in range(SIZE):
-        image.putpixel((x, 7), rgba(PIPE_RAMP[3]))
-        image.putpixel((x, 8), rgba(PIPE_RAMP[0]))
+            image.putpixel((x, y), rgba(shaded(ramp, x, y, 0, 0, SIZE - 1, SIZE - 1)))
+    for band in ARM_BANDS:
+        for row in STRIPE_ROWS[tier]:
+            for x in range(1, SIZE - 1):
+                image.putpixel((x, band.start + row), rgba(ramp[3]))
+    for x, y in STUD:
+        image.putpixel((x, y), rgba(TIER_ACCENTS[tier - 1]))
     return image
 
 
@@ -80,14 +96,16 @@ def wrench():
     return image
 
 
-def upgrade():
+def upgrade(tier):
+    ramp = TIER_RAMPS[tier - 1]
     image = blank()
     for y in range(3, 13):
         for x in range(3, 13):
-            image.putpixel((x, y), rgba(shaded(UPGRADE_RAMP, x, y, 3, 3, 12, 12)))
-    for i in range(5, 11):
-        image.putpixel((7, i), rgba(UPGRADE_RAMP[0]))
-        image.putpixel((i, 7), rgba(UPGRADE_RAMP[0]))
+            image.putpixel((x, y), rgba(shaded(ramp, x, y, 3, 3, 12, 12)))
+    for x, y in PIPS[:tier - 1]:
+        for dx in range(2):
+            for dy in range(2):
+                image.putpixel((x + dx, y + dy), rgba(TIER_ACCENTS[tier - 1]))
     return image
 
 
@@ -97,9 +115,11 @@ def save(image, path):
 
 
 def main():
-    save(pipe(), ASSETS / "block" / "pipe.png")
+    for tier in range(1, len(TIER_RAMPS) + 1):
+        save(pipe(tier), ASSETS / "block" / f"pipe_tier_{tier}.png")
+        if tier > 1:
+            save(upgrade(tier), ASSETS / "item" / ("pipe_upgrade.png" if tier == 2 else f"pipe_upgrade_{tier}.png"))
     save(wrench(), ASSETS / "item" / "pipe_wrench.png")
-    save(upgrade(), ASSETS / "item" / "pipe_upgrade.png")
     sprites = ASSETS / "gui" / "sprites"
     save(bevel(16, PANEL, SLOT_LIGHT, SLOT_DARK), sprites / "panel.png")
     save(bevel(18, SLOT_FILL, SLOT_LIGHT, SLOT_DARK), sprites / "slot.png")

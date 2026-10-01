@@ -1,8 +1,8 @@
 {
     "parent": "minecraft:block/block",
     "textures": {
-        "pipe": "universal_pipes:block/pipe",
-        "particle": "universal_pipes:block/pipe"
+        "pipe": "universal_pipes:block/pipe_tier_1",
+        "particle": "universal_pipes:block/pipe_tier_1"
     },
     "elements": [
         {

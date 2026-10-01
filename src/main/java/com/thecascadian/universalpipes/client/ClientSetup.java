@@ -4,25 +4,28 @@ import com.thecascadian.universalpipes.UniversalPipes;
 import com.thecascadian.universalpipes.block.PipeBlock;
 import com.thecascadian.universalpipes.block.PipeEntity;
 import com.thecascadian.universalpipes.core.Appearance;
+import com.thecascadian.universalpipes.item.PipeUpgrade;
 import com.thecascadian.universalpipes.registry.RegistryHandler;
-import net.minecraft.world.level.material.MapColor;
+import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
-/** Pipe textures are grayscale; the look, or else the tier's vanilla map colour, is the tint. */
+/** Tier textures are authored per tier; dyes from the appearance are the only tint. */
 @EventBusSubscriber(modid = UniversalPipes.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class ClientSetup {
 
-    private static final MapColor[] TIER_COLORS = { MapColor.WOOD, MapColor.METAL, MapColor.GOLD, MapColor.DIAMOND,
-            MapColor.COLOR_PURPLE };
     private static final int NO_TINT = -1;
     private static final int OPAQUE = 0xFF000000;
     private static final int BODY_INDEX = 0;
     private static final int ACCENT_INDEX = 1;
+    private static final ResourceLocation TIER_PROPERTY = ResourceLocation.fromNamespaceAndPath(UniversalPipes.MODID,
+            "tier");
     private static final String PIPE_MODEL = "pipe";
     private static final String INVENTORY_VARIANT = "inventory";
 
@@ -39,15 +42,15 @@ public final class ClientSetup {
         event.register((state, level, pos, tintIndex) -> {
             Appearance appearance = level != null && pos != null && level.getBlockEntity(pos) instanceof PipeEntity pipe
                     ? pipe.appearance() : Appearance.NONE;
-            return tint(appearance, tintIndex, state.getValue(PipeBlock.TIER));
+            return tint(appearance, tintIndex);
         }, RegistryHandler.PIPE.get());
     }
 
     @SubscribeEvent
     public static void onItemColors(RegisterColorHandlersEvent.Item event) {
         event.register((stack, tintIndex) -> tint(
-                stack.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS).appearance(), tintIndex,
-                stack.getOrDefault(RegistryHandler.TIER_COMPONENT.get(), 1)), RegistryHandler.PIPE_ITEM.get());
+                stack.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS).appearance(), tintIndex),
+                RegistryHandler.PIPE_ITEM.get());
     }
 
     /** Wraps every in-world pipe model; the inventory model is left alone because it has no block entity. */
@@ -60,21 +63,31 @@ public final class ClientSetup {
     }
 
     /**
-     * Tint index 0 colours the body and index 1 the collars. An unset accent
-     * follows the body; with a material and no dye the sprite shows unmodified,
-     * and with neither the tier colour applies.
+     * The tier is shown by its own texture, so tinting is only ever a dye:
+     * index 0 colours the body and index 1 the collars, and an unset accent
+     * follows the body.
      */
-    private static int tint(Appearance appearance, int tintIndex, int tier) {
+    private static int tint(Appearance appearance, int tintIndex) {
         if (tintIndex != BODY_INDEX && tintIndex != ACCENT_INDEX)
             return NO_TINT;
         int chosen = tintIndex == ACCENT_INDEX && appearance.accent() != Appearance.UNSET ? appearance.accent()
                 : appearance.tint();
-        if (chosen != Appearance.UNSET)
-            return chosen | OPAQUE;
-        return appearance.material().isPresent() ? NO_TINT : color(tier);
+        return chosen == Appearance.UNSET ? NO_TINT : chosen | OPAQUE;
     }
 
-    private static int color(int tier) {
-        return TIER_COLORS[Math.max(1, Math.min(tier, TIER_COLORS.length)) - 1].col | 0xFF000000;
+    /**
+     * Item models pick their tier texture through a predicate, as an item model
+     * cannot read components itself. The value is the tier as a fraction of the
+     * maximum because the property function clamps its result to the range 0 to 1.
+     */
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            ItemProperties.register(RegistryHandler.PIPE_ITEM.get(), TIER_PROPERTY,
+                    (stack, level, entity, seed) -> stack.getOrDefault(RegistryHandler.TIER_COMPONENT.get(), 1)
+                            / (float) PipeBlock.MAX_TIER);
+            ItemProperties.register(RegistryHandler.PIPE_UPGRADE.get(), TIER_PROPERTY,
+                    (stack, level, entity, seed) -> PipeUpgrade.tierOf(stack) / (float) PipeBlock.MAX_TIER);
+        });
     }
 }

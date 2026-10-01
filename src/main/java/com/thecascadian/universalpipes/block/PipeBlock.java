@@ -160,7 +160,9 @@ public class PipeBlock extends Block implements EntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level.isClientSide || !stack.has(RegistryHandler.SETTINGS.get()))
             return;
-        entityFor(level, pos).applyComponents(stack.getComponents(), stack.getComponentsPatch());
+        PipeEntity pipe = entityFor(level, pos);
+        pipe.applyComponents(stack.getComponents(), stack.getComponentsPatch());
+        pipe.syncAppearance();
         refresh(level, pos);
     }
 

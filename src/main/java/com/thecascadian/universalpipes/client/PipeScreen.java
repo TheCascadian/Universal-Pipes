@@ -25,6 +25,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.DyeColor;
@@ -38,14 +39,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.IntConsumer;
 import java.util.function.UnaryOperator;
 
 /**
  * The one pipe screen: 176 pixels wide, 18 pixel slots, the standard inventory
- * position, extended in height only. Tabs choose the transport type, the three
- * view buttons choose between settings, filters and the look of the pipe. The client holds a working
- * copy of the configuration and sends the whole value after each edit; the
- * server sanitizes it and is the only authority.
+ * position, extended in height only. Three views (settings, filters, look)
+ * share one row of tabs, and each view is a few rows of controls. Nothing needs
+ * a slot to be picked up first: clicking an item in the inventory adds it to the
+ * filter or sets the material, and a carried item may be dropped on the panel.
+ * The client holds a working copy of the configuration and sends the whole
+ * value after each edit; the server sanitizes it and is the only authority.
  */
 public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
@@ -53,51 +57,59 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     private static final ResourceLocation SLOT = ResourceLocation.fromNamespaceAndPath(UniversalPipes.MODID, "slot");
 
     private static final int TITLE = 0xFF404040;
-    private static final int POSITIVE = 0xFF55FF55;
-    private static final int NEGATIVE = 0xFFFF5555;
-    private static final int VALUE = 0xFFFFAA00;
-    private static final int SECONDARY = 0xFFAAAAAA;
-    private static final int MUTED = 0xFF555555;
-    private static final int SLOT_FILL = 0xFF8B8B8B;
+    private static final int POSITIVE = 0xFF006600;
+    private static final int NEGATIVE = 0xFFAA0000;
+    private static final int DENY = 0xFF8A4B00;
+    private static final int SECONDARY = 0xFF555555;
+    private static final int DISABLED = 0xFF6E6E6E;
+    private static final int ROW_FILL = 0xFF8B8B8B;
+    private static final int ROW_SELECTED = 0xFFDADADA;
+    private static final int OPAQUE = 0xFF000000;
 
     private static final int WIDTH = 176;
     private static final int BASE_HEIGHT = 166;
     private static final int LEFT = 8;
     private static final int FULL_WIDTH = 160;
-    private static final int HALF_WIDTH = 76;
-    private static final int RIGHT = 92;
+    private static final int HALF_WIDTH = 78;
+    private static final int RIGHT = 90;
     private static final int TAB_WIDTH = 52;
     private static final int TAB_STEP = 54;
     private static final int BUTTON_HEIGHT = 14;
-    private static final int ROW_TABS = 18;
-    private static final int ROW_VIEWS = 34;
-    private static final int ROW_CONTENT = 54;
+    private static final int ROW_TABS = 16;
+    private static final int ROW_1 = 34;
+    private static final int ROW_2 = 52;
+    private static final int ROW_3 = 70;
+    private static final int ROW_4 = 88;
+    private static final int ROW_5 = 106;
     private static final int SLOT_SIZE = 18;
     private static final int GHOST_COLUMNS = 9;
+    private static final int TEXT_INSET = 3;
+    private static final int TEXT_DROP = 4;
+
     private static final int RULE_ROWS = 3;
-    private static final int ROW_HEIGHT = 12;
-    private static final int ROW_LIST_Y = 70;
-    private static final int NUMBER_MAX_LENGTH = 9;
+    private static final int PICKER_ROWS = 6;
+    private static final int LIST_ROW_HEIGHT = 12;
+    private static final int RULE_BUTTONS_Y = 108;
+    private static final int RULE_EXPRESSION_Y = 126;
+    private static final int RULE_CONTROLS_Y = 144;
+    private static final int PICKER_BUTTONS_Y = 128;
     private static final int RULE_BUTTON_WIDTH = 38;
     private static final int RULE_BUTTON_STEP = 40;
-    private static final int ROW_STATUS = 73;
-    private static final int ROW_CYCLES = 84;
-    private static final int ROW_LABELS = 103;
-    private static final int ROW_BOXES = 113;
-    private static final int ROW_COPY = 131;
-    private static final int ROW_ORDER = 147;
-    private static final int PRESENT_LIMIT_SLACK = 6;
+    private static final int VERDICT_WIDTH = 50;
+    private static final int SCOPE_WIDTH = 56;
+    private static final int LIMIT_WIDTH = 50;
+    private static final int CONTROL_GAP = 2;
+    private static final int NUMBER_MAX_LENGTH = 9;
     private static final int CLIPBOARD_LIMIT = 12000;
-    private static final int ROW_PAINT = ROW_CONTENT;
-    private static final int ROW_SWATCH = 72;
-    private static final int ROW_MATERIAL = 112;
-    private static final int ROW_GLOW = 134;
-    private static final int ROW_RESET = 152;
+
     private static final int SWATCH_SIZE = 16;
     private static final int SWATCH_STEP = 20;
     private static final int SWATCH_COLUMNS = 8;
-    private static final int MATERIAL_LABEL = 24;
-    private static final int OPAQUE = 0xFF000000;
+    private static final int LOOK_PAINT_Y = 78;
+    private static final int LOOK_MATERIAL_Y = 98;
+    private static final int LOOK_GLOW_Y = 122;
+    private static final int MATERIAL_LABEL = 22;
+    private static final int CLEAR_WIDTH = 44;
     private static final DyeColor[] DYES = DyeColor.values();
 
     private enum Picker { NONE, PRIORITY, SCOPE }
@@ -106,10 +118,10 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
     private TransportType tab = TransportType.ITEM;
     private View view = View.SETTINGS;
-    private boolean accentTarget;
-    private Appearance look;
     private Picker picker = Picker.NONE;
+    private boolean accentTarget;
     private EndpointConfig config;
+    private Appearance look;
     private int selectedRule = -1;
     private int scroll;
     private Status shownStatus = Status.IDLE;
@@ -139,13 +151,13 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         }
     }
 
+    private void send() {
+        PacketDistributor.sendToServer(new Payloads.ConfigUpdate(config, look));
+    }
+
     private void edit(UnaryOperator<EndpointConfig> change) {
         config = change.apply(config);
         send();
-    }
-
-    private void send() {
-        PacketDistributor.sendToServer(new Payloads.ConfigUpdate(config, look));
     }
 
     private void editLook(UnaryOperator<Appearance> change) {
@@ -161,192 +173,127 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         editTransport(transport -> transport.withFilter(change.apply(transport.filter())));
     }
 
-    private void rebuild() {
-        clearWidgets();
-        addRenderableWidget(viewButton(View.SETTINGS, 0));
-        addRenderableWidget(viewButton(View.FILTERS, 1));
-        addRenderableWidget(viewButton(View.LOOK, 2));
-        if (view == View.LOOK) {
-            addLookWidgets();
-            return;
-        }
-        for (TransportType type : TransportType.values()) {
-            Button button = Button.builder(Component.translatable(type.translationKey()), pressed -> {
-                tab = type;
-                picker = Picker.NONE;
-                selectedRule = -1;
-                rebuild();
-            }).bounds(leftPos + LEFT + type.ordinal() * TAB_STEP, topPos + ROW_TABS, TAB_WIDTH, BUTTON_HEIGHT).build();
-            button.active = type != tab;
-            addRenderableWidget(button);
-        }
-        if (view == View.FILTERS)
-            addFilterWidgets();
-        else
-            addSettingWidgets();
+    private static Component text(String key) {
+        return Component.translatable("gui." + UniversalPipes.MODID + "." + key);
     }
 
-    private Button viewButton(View target, int index) {
+    private int x(int offset) {
+        return leftPos + offset;
+    }
+
+    private int y(int offset) {
+        return topPos + offset;
+    }
+
+    private void rebuild() {
+        clearWidgets();
+        for (View target : View.values())
+            addRenderableWidget(viewButton(target));
+        if (picker != Picker.NONE) {
+            addPickerWidgets();
+            return;
+        }
+        switch (view) {
+            case SETTINGS -> addSettingWidgets();
+            case FILTERS -> addFilterWidgets();
+            case LOOK -> addLookWidgets();
+        }
+    }
+
+    private Button viewButton(View target) {
         Button button = Button.builder(text("view." + target.name().toLowerCase(Locale.ROOT)), pressed -> {
             view = target;
             picker = Picker.NONE;
             rebuild();
-        }).bounds(leftPos + LEFT + index * TAB_STEP, topPos + ROW_VIEWS, TAB_WIDTH, BUTTON_HEIGHT).build();
+        }).bounds(x(LEFT + target.ordinal() * TAB_STEP), y(ROW_TABS), TAB_WIDTH, BUTTON_HEIGHT).build();
         button.active = view != target;
         return button;
     }
 
-    /** The look view: paint target, dye swatches, material slot and glow. The swatches and slot are drawn and hit-tested by hand. */
-    private void addLookWidgets() {
-        addRenderableWidget(CycleButton.onOffBuilder(accentTarget).create(leftPos + LEFT, topPos + ROW_PAINT, HALF_WIDTH,
-                BUTTON_HEIGHT + 2, text("paint"), (button, value) -> accentTarget = value));
-        addRenderableWidget(Button.builder(text("clear_color"), pressed -> editLook(
-                current -> accentTarget ? current.withAccent(Appearance.UNSET) : current.withTint(Appearance.UNSET)))
-                .bounds(leftPos + RIGHT, topPos + ROW_PAINT, HALF_WIDTH, BUTTON_HEIGHT).build());
-        addRenderableWidget(Button.builder(text("clear_material"), pressed -> editLook(
-                current -> current.withMaterial(Optional.empty())))
-                .bounds(leftPos + LEFT + MATERIAL_LABEL, topPos + ROW_MATERIAL + 2, FULL_WIDTH - MATERIAL_LABEL,
-                        BUTTON_HEIGHT).build());
-        addRenderableWidget(CycleButton.onOffBuilder(look.glow()).create(leftPos + LEFT, topPos + ROW_GLOW, FULL_WIDTH,
-                BUTTON_HEIGHT + 2, text("glow"), (button, value) -> editLook(current -> current.withGlow(value))));
-        addRenderableWidget(Button.builder(text("reset_look"), pressed -> {
-            editLook(current -> Appearance.NONE);
-            rebuild();
-        }).bounds(leftPos + LEFT, topPos + ROW_RESET, FULL_WIDTH, BUTTON_HEIGHT).build());
-    }
-
-    private int swatchX(int index) {
-        return leftPos + LEFT + (index % SWATCH_COLUMNS) * SWATCH_STEP;
-    }
-
-    private int swatchY(int index) {
-        return topPos + ROW_SWATCH + (index / SWATCH_COLUMNS) * SWATCH_STEP;
-    }
-
-    private static int rgb(DyeColor dye) {
-        return dye.getTextureDiffuseColor() & Appearance.RGB_MASK;
-    }
-
-    private boolean inside(double mouseX, double mouseY, int x, int y, int size) {
-        return mouseX >= x && mouseX < x + size && mouseY >= y && mouseY < y + size;
-    }
-
-    private boolean clickLook(double mouseX, double mouseY) {
-        for (int i = 0; i < DYES.length; i++) {
-            if (inside(mouseX, mouseY, swatchX(i), swatchY(i), SWATCH_SIZE)) {
-                int color = rgb(DYES[i]);
-                editLook(current -> accentTarget ? current.withAccent(color) : current.withTint(color));
-                return true;
-            }
-        }
-        if (!inside(mouseX, mouseY, leftPos + LEFT, topPos + ROW_MATERIAL, SLOT_SIZE)
-                || !(menu.getCarried().getItem() instanceof BlockItem block))
-            return false;
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block.getBlock());
-        if (Appearance.allowed(id))
-            editLook(current -> current.withMaterial(Optional.of(id)));
-        return true;
-    }
-
-    private void drawLook(GuiGraphics graphics) {
-        int selected = accentTarget ? look.accent() : look.tint();
-        for (int i = 0; i < DYES.length; i++) {
-            int x = swatchX(i);
-            int y = swatchY(i);
-            boolean chosen = selected == rgb(DYES[i]);
-            graphics.fill(x - 1, y - 1, x + SWATCH_SIZE + 1, y + SWATCH_SIZE + 1, chosen ? TITLE : MUTED);
-            graphics.fill(x, y, x + SWATCH_SIZE, y + SWATCH_SIZE, rgb(DYES[i]) | OPAQUE);
-        }
-        graphics.blitSprite(SLOT, leftPos + LEFT, topPos + ROW_MATERIAL, SLOT_SIZE, SLOT_SIZE);
-        look.material().map(BuiltInRegistries.BLOCK::get).ifPresent(block -> graphics.renderFakeItem(
-                new ItemStack(block), leftPos + LEFT + 1, topPos + ROW_MATERIAL + 1));
+    private CycleButton<TransportType> typeCycle() {
+        return CycleButton.builder((TransportType type) -> Component.translatable(type.translationKey()))
+                .withValues(TransportType.values()).withInitialValue(tab).displayOnlyValue()
+                .create(x(LEFT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT, text("type"), (button, value) -> {
+                    tab = value;
+                    selectedRule = -1;
+                    scroll = 0;
+                    rebuild();
+                });
     }
 
     private void addSettingWidgets() {
-        if (picker == Picker.PRIORITY) {
-            addRenderableWidget(Button.builder(text("done"), pressed -> {
-                picker = Picker.NONE;
-                rebuild();
-            }).bounds(leftPos + LEFT, topPos + ROW_LIST_Y + RULE_ROWS * ROW_HEIGHT + 2, FULL_WIDTH, BUTTON_HEIGHT)
-                    .build());
-            return;
-        }
         EndpointConfig.Transport transport = config.transport(tab);
-        addRenderableWidget(CycleButton.onOffBuilder(transport.enabled()).create(leftPos + LEFT, topPos + ROW_CONTENT,
-                FULL_WIDTH, BUTTON_HEIGHT + 2, text("enabled"), (button, value) -> editTransport(t -> t.withEnabled(value))));
+        addRenderableWidget(typeCycle());
+        addRenderableWidget(CycleButton.booleanBuilder(text("transfer.on"), text("transfer.off")).displayOnlyValue()
+                .withInitialValue(transport.enabled()).create(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT,
+                        text("transfer"), (button, value) -> editTransport(t -> t.withEnabled(value))));
         addRenderableWidget(CycleButton.builder((EndpointConfig.Redstone value) -> text("redstone." + value.getSerializedName()))
-                .withValues(EndpointConfig.Redstone.values()).withInitialValue(config.redstone())
-                .create(leftPos + LEFT, topPos + ROW_CYCLES, HALF_WIDTH, BUTTON_HEIGHT + 2, text("redstone"),
+                .withValues(EndpointConfig.Redstone.values()).withInitialValue(config.redstone()).displayOnlyValue()
+                .withTooltip(value -> Tooltip.create(text("redstone.tooltip")))
+                .create(x(LEFT), y(ROW_2), HALF_WIDTH, BUTTON_HEIGHT, text("redstone"),
                         (button, value) -> edit(c -> c.withRedstone(value))));
         addRenderableWidget(CycleButton.builder((EndpointConfig.Distribution value) -> text("distribution." + value.getSerializedName()))
-                .withValues(EndpointConfig.Distribution.values()).withInitialValue(config.distribution())
-                .create(leftPos + RIGHT, topPos + ROW_CYCLES, HALF_WIDTH, BUTTON_HEIGHT + 2, text("distribution"),
-                        (button, value) -> {
-                            edit(c -> c.withDistribution(value));
-                            rebuild();
-                        }));
-        addRenderableWidget(numberBox(LEFT, ROW_BOXES, transport.keepInSource(), "keep",
+                .withValues(EndpointConfig.Distribution.values()).withInitialValue(config.distribution()).displayOnlyValue()
+                .withTooltip(value -> Tooltip.create(text("distribution.tooltip")))
+                .create(x(RIGHT), y(ROW_2), HALF_WIDTH, BUTTON_HEIGHT, text("distribution"), (button, value) -> {
+                    edit(c -> c.withDistribution(value));
+                    rebuild();
+                }));
+        addRenderableWidget(numberBox(LEFT, ROW_3, transport.keepInSource(), "keep",
                 value -> editTransport(t -> t.withKeep(value))));
-        addRenderableWidget(numberBox(RIGHT, ROW_BOXES, transport.stopAtDestination(), "stop",
+        addRenderableWidget(numberBox(RIGHT, ROW_3, transport.stopAtDestination(), "stop",
                 value -> editTransport(t -> t.withStop(value))));
         addRenderableWidget(Button.builder(text("copy"), pressed -> copy())
-                .bounds(leftPos + LEFT, topPos + ROW_COPY, HALF_WIDTH, BUTTON_HEIGHT).build());
+                .bounds(x(LEFT), y(ROW_4), HALF_WIDTH, BUTTON_HEIGHT).build());
         addRenderableWidget(Button.builder(text("paste"), pressed -> paste())
-                .bounds(leftPos + RIGHT, topPos + ROW_COPY, HALF_WIDTH, BUTTON_HEIGHT).build());
+                .bounds(x(RIGHT), y(ROW_4), HALF_WIDTH, BUTTON_HEIGHT).build());
         if (config.distribution() == EndpointConfig.Distribution.PRIORITY) {
             addRenderableWidget(Button.builder(text("order"), pressed -> {
                 picker = Picker.PRIORITY;
                 scroll = 0;
                 rebuild();
-            }).bounds(leftPos + LEFT, topPos + ROW_ORDER, FULL_WIDTH, BUTTON_HEIGHT).build());
+            }).bounds(x(LEFT), y(ROW_5), FULL_WIDTH, BUTTON_HEIGHT).build());
         }
     }
 
-    private EditBox numberBox(int x, int y, int initial, String key, java.util.function.IntConsumer onChange) {
-        EditBox box = new EditBox(font, leftPos + x, topPos + y, HALF_WIDTH, BUTTON_HEIGHT, text(key));
+    private EditBox numberBox(int offset, int row, int initial, String key, IntConsumer onChange) {
+        EditBox box = new EditBox(font, x(offset), y(row), HALF_WIDTH, BUTTON_HEIGHT, text(key));
         box.setMaxLength(NUMBER_MAX_LENGTH);
         box.setFilter(value -> value.chars().allMatch(Character::isDigit));
-        box.setValue(Integer.toString(initial));
+        box.setHint(text(key + ".hint"));
+        box.setValue(initial == 0 ? "" : Integer.toString(initial));
         box.setTooltip(Tooltip.create(text(key + ".tooltip")));
         box.setResponder(value -> onChange.accept(value.isEmpty() ? 0 : Integer.parseInt(value)));
         return box;
     }
 
     private void addFilterWidgets() {
+        addRenderableWidget(typeCycle());
         if (tab == TransportType.ENERGY)
             return;
         FilterSet filter = config.transport(tab).filter();
         addRenderableWidget(Button.builder(text(filter.advanced() ? "mode.advanced" : "mode.simple"), pressed -> {
             editFilter(f -> new FilterSet(!f.advanced(), f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
-            picker = Picker.NONE;
+            selectedRule = -1;
             rebuild();
-        }).bounds(leftPos + LEFT, topPos + ROW_CONTENT, HALF_WIDTH, BUTTON_HEIGHT).build());
+        }).bounds(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT).build());
         if (!filter.advanced()) {
             addRenderableWidget(Button.builder(text(filter.whitelist() ? "whitelist" : "blacklist"), pressed -> {
                 editFilter(f -> new FilterSet(f.advanced(), !f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
                 rebuild();
-            }).bounds(leftPos + RIGHT, topPos + ROW_CONTENT, HALF_WIDTH, BUTTON_HEIGHT).build());
+            }).bounds(x(LEFT), y(ROW_2), FULL_WIDTH, BUTTON_HEIGHT).build());
             return;
         }
         addRenderableWidget(Button.builder(text(filter.firstMatch() ? "first_match" : "all_match"), pressed -> {
             editFilter(f -> new FilterSet(f.advanced(), f.whitelist(), f.entries(), !f.firstMatch(), f.rules()));
             rebuild();
-        }).bounds(leftPos + RIGHT, topPos + ROW_CONTENT, HALF_WIDTH, BUTTON_HEIGHT).build());
+        }).bounds(x(LEFT), y(ROW_2), FULL_WIDTH, BUTTON_HEIGHT).build());
         addRuleEditor(filter);
     }
 
     private void addRuleEditor(FilterSet filter) {
-        int buttonY = topPos + ROW_LIST_Y + RULE_ROWS * ROW_HEIGHT + 2;
-        addRuleButton(0, buttonY, "rule.add", pressed -> {
-            if (filter.rules().size() >= PipeData.tier(menu.tier()).maxRules())
-                return;
-            List<FilterSet.Rule> rules = new ArrayList<>(filter.rules());
-            rules.add(new FilterSet.Rule("", true, List.of(), 0, true));
-            selectedRule = rules.size() - 1;
-            editFilter(f -> withRules(f, rules));
-            rebuild();
-        });
-        addRuleButton(1, buttonY, "rule.remove", pressed -> {
+        addRuleButton(0, "rule.add", pressed -> addRule(""));
+        addRuleButton(1, "rule.remove", pressed -> {
             if (selectedRule < 0 || selectedRule >= filter.rules().size())
                 return;
             List<FilterSet.Rule> rules = new ArrayList<>(filter.rules());
@@ -355,51 +302,84 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
             editFilter(f -> withRules(f, rules));
             rebuild();
         });
-        addRuleButton(2, buttonY, "rule.up", pressed -> moveRule(filter, -1));
-        addRuleButton(3, buttonY, "rule.down", pressed -> moveRule(filter, 1));
+        addRuleButton(2, "rule.up", pressed -> moveRule(filter, -1));
+        addRuleButton(3, "rule.down", pressed -> moveRule(filter, 1));
         if (selectedRule < 0 || selectedRule >= filter.rules().size())
             return;
         FilterSet.Rule rule = filter.rules().get(selectedRule);
-        int editorY = buttonY + BUTTON_HEIGHT + 2;
-        EditBox expression = new EditBox(font, leftPos + LEFT, editorY, FULL_WIDTH, BUTTON_HEIGHT, text("expression"));
+        int index = selectedRule;
+        EditBox expression = new EditBox(font, x(LEFT), y(RULE_EXPRESSION_Y), FULL_WIDTH, BUTTON_HEIGHT, text("expression"));
         expression.setMaxLength(PipeData.limits().maxExpressionLength());
+        expression.setHint(text("expression.hint"));
         expression.setValue(rule.expression());
         expression.setTooltip(Tooltip.create(text("expression.tooltip")));
-        int index = selectedRule;
         expression.setResponder(value -> updateRule(index, r -> new FilterSet.Rule(value, r.allow(), r.scope(), r.limit(), r.enabled())));
         addRenderableWidget(expression);
-        int rowY = editorY + BUTTON_HEIGHT + 2;
-        addRenderableWidget(CycleButton.booleanBuilder(text("rule.allow"), text("rule.deny")).withInitialValue(rule.allow())
-                .create(leftPos + LEFT, rowY, 50, BUTTON_HEIGHT, text("rule.verdict"),
-                        (button, value) -> updateRule(index, r -> new FilterSet.Rule(r.expression(), value, r.scope(), r.limit(), r.enabled()))));
-        addRenderableWidget(CycleButton.booleanBuilder(text("rule.chosen"), text("rule.any")).withInitialValue(!rule.scope().isEmpty())
-                .create(leftPos + LEFT + 52, rowY, 50, BUTTON_HEIGHT, text("rule.scope"), (button, value) -> {
-                    picker = value ? Picker.SCOPE : Picker.NONE;
-                    if (!value)
-                        updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), List.of(), r.limit(), r.enabled()));
-                    rebuild();
-                }));
-        addRenderableWidget(CycleButton.onOffBuilder(rule.enabled()).create(leftPos + LEFT + 104, rowY, 56,
-                BUTTON_HEIGHT, text("rule.enabled"),
-                (button, value) -> updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(), r.limit(), value))));
-        EditBox limit = new EditBox(font, leftPos + LEFT, rowY + BUTTON_HEIGHT + 2, 50, BUTTON_HEIGHT, text("rule.limit"));
-        limit.setMaxLength(NUMBER_MAX_LENGTH);
-        limit.setFilter(value -> value.chars().allMatch(Character::isDigit));
-        limit.setValue(Integer.toString(rule.limit()));
-        limit.setTooltip(Tooltip.create(text("rule.limit.tooltip")));
-        limit.setResponder(value -> updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(),
-                value.isEmpty() ? 0 : Integer.parseInt(value), r.enabled())));
-        addRenderableWidget(limit);
-        addRenderableWidget(Button.builder(text("rule.targets"), pressed -> {
-            picker = picker == Picker.SCOPE ? Picker.NONE : Picker.SCOPE;
+        addRenderableWidget(CycleButton.booleanBuilder(text("rule.allow"), text("rule.deny")).displayOnlyValue()
+                .withInitialValue(rule.allow()).create(x(LEFT), y(RULE_CONTROLS_Y), VERDICT_WIDTH, BUTTON_HEIGHT,
+                        text("rule.verdict"), (button, value) -> updateRule(index,
+                                r -> new FilterSet.Rule(r.expression(), value, r.scope(), r.limit(), r.enabled()))));
+        Component scope = rule.scope().isEmpty() ? text("scope.any")
+                : Component.translatable("gui." + UniversalPipes.MODID + ".scope.chosen", rule.scope().size());
+        addRenderableWidget(Button.builder(scope, pressed -> {
+            picker = Picker.SCOPE;
             scroll = 0;
             rebuild();
-        }).bounds(leftPos + LEFT + 52, rowY + BUTTON_HEIGHT + 2, 108, BUTTON_HEIGHT).build());
+        }).bounds(x(LEFT + VERDICT_WIDTH + CONTROL_GAP), y(RULE_CONTROLS_Y), SCOPE_WIDTH, BUTTON_HEIGHT)
+                .tooltip(Tooltip.create(text("scope.tooltip"))).build());
+        EditBox limit = numberBox(LEFT + VERDICT_WIDTH + SCOPE_WIDTH + 2 * CONTROL_GAP, RULE_CONTROLS_Y, rule.limit(),
+                "limit", value -> updateRule(index,
+                        r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(), value, r.enabled())));
+        limit.setWidth(LIMIT_WIDTH);
+        addRenderableWidget(limit);
     }
 
-    private void addRuleButton(int column, int y, String key, Button.OnPress action) {
+    private void addRuleButton(int column, String key, Button.OnPress action) {
         addRenderableWidget(Button.builder(text(key), action)
-                .bounds(leftPos + LEFT + column * RULE_BUTTON_STEP, y, RULE_BUTTON_WIDTH, BUTTON_HEIGHT).build());
+                .bounds(x(LEFT + column * RULE_BUTTON_STEP), y(RULE_BUTTONS_Y), RULE_BUTTON_WIDTH, BUTTON_HEIGHT).build());
+    }
+
+    private void addPickerWidgets() {
+        boolean scope = picker == Picker.SCOPE;
+        if (scope) {
+            addRenderableWidget(Button.builder(text("scope.any"), pressed -> {
+                updateRule(selectedRule, r -> new FilterSet.Rule(r.expression(), r.allow(), List.of(), r.limit(), r.enabled()));
+                picker = Picker.NONE;
+                rebuild();
+            }).bounds(x(LEFT), y(PICKER_BUTTONS_Y), HALF_WIDTH, BUTTON_HEIGHT).build());
+        }
+        addRenderableWidget(Button.builder(text("done"), pressed -> {
+            picker = Picker.NONE;
+            rebuild();
+        }).bounds(x(scope ? RIGHT : LEFT), y(PICKER_BUTTONS_Y), scope ? HALF_WIDTH : FULL_WIDTH, BUTTON_HEIGHT).build());
+    }
+
+    private void addLookWidgets() {
+        addRenderableWidget(CycleButton.booleanBuilder(text("paint.collar"), text("paint.body")).displayOnlyValue()
+                .withInitialValue(accentTarget).create(x(LEFT), y(LOOK_PAINT_Y), HALF_WIDTH, BUTTON_HEIGHT,
+                        text("paint"), (button, value) -> accentTarget = value));
+        addRenderableWidget(Button.builder(text("clear_color"), pressed -> editLook(
+                current -> accentTarget ? current.withAccent(Appearance.UNSET) : current.withTint(Appearance.UNSET)))
+                .bounds(x(RIGHT), y(LOOK_PAINT_Y), HALF_WIDTH, BUTTON_HEIGHT).build());
+        addRenderableWidget(Button.builder(text("clear"), pressed -> editLook(current -> current.withMaterial(Optional.empty())))
+                .bounds(x(LEFT + FULL_WIDTH - CLEAR_WIDTH), y(LOOK_MATERIAL_Y + 2), CLEAR_WIDTH, BUTTON_HEIGHT).build());
+        addRenderableWidget(CycleButton.onOffBuilder(look.glow()).displayOnlyValue().create(x(LEFT), y(LOOK_GLOW_Y),
+                HALF_WIDTH, BUTTON_HEIGHT, text("glow"), (button, value) -> editLook(current -> current.withGlow(value))));
+        addRenderableWidget(Button.builder(text("reset_look"), pressed -> {
+            editLook(current -> Appearance.NONE);
+            rebuild();
+        }).bounds(x(RIGHT), y(LOOK_GLOW_Y), HALF_WIDTH, BUTTON_HEIGHT).build());
+    }
+
+    private void addRule(String expression) {
+        FilterSet filter = config.transport(tab).filter();
+        if (filter.rules().size() >= PipeData.tier(menu.tier()).maxRules())
+            return;
+        List<FilterSet.Rule> rules = new ArrayList<>(filter.rules());
+        rules.add(new FilterSet.Rule(expression, true, List.of(), 0, true));
+        selectedRule = rules.size() - 1;
+        editFilter(f -> withRules(f, rules));
+        rebuild();
     }
 
     private void moveRule(FilterSet filter, int delta) {
@@ -416,7 +396,7 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
     private void updateRule(int index, UnaryOperator<FilterSet.Rule> change) {
         editFilter(f -> {
-            if (index >= f.rules().size())
+            if (index < 0 || index >= f.rules().size())
                 return f;
             List<FilterSet.Rule> rules = new ArrayList<>(f.rules());
             rules.set(index, change.apply(rules.get(index)));
@@ -448,18 +428,6 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         }
     }
 
-    private static Component text(String key) {
-        return Component.translatable("gui." + UniversalPipes.MODID + "." + key);
-    }
-
-    private int ghostX(int index) {
-        return leftPos + LEFT + index * SLOT_SIZE;
-    }
-
-    private int ghostY() {
-        return topPos + ROW_CONTENT + 26;
-    }
-
     private ItemStack displayStack(String id) {
         ResourceLocation location = ResourceLocation.tryParse(id);
         if (location == null)
@@ -472,99 +440,166 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         return new ItemStack(BuiltInRegistries.ITEM.get(location));
     }
 
-    private String idOf(ItemStack carried) {
+    private String idOf(ItemStack stack) {
         if (tab == TransportType.FLUID) {
-            return FluidUtil.getFluidContained(carried).map(fluid -> BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString())
+            return FluidUtil.getFluidContained(stack).map(fluid -> BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString())
                     .orElse(null);
         }
-        return BuiltInRegistries.ITEM.getKey(carried.getItem()).toString();
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
     }
 
     private boolean simpleFilterShown() {
-        return view == View.FILTERS && tab != TransportType.ENERGY && !config.transport(tab).filter().advanced();
+        return view == View.FILTERS && picker == Picker.NONE && tab != TransportType.ENERGY
+                && !config.transport(tab).filter().advanced();
     }
 
     private boolean advancedFilterShown() {
-        return view == View.FILTERS && tab != TransportType.ENERGY && config.transport(tab).filter().advanced();
+        return view == View.FILTERS && picker == Picker.NONE && tab != TransportType.ENERGY
+                && config.transport(tab).filter().advanced();
+    }
+
+    /**
+     * Uses a stack as input for the current view: a filter entry or rule in the
+     * filter view, the material in the look view. Returns whether it was taken,
+     * so that the caller leaves the stack alone and no pickup happens.
+     */
+    private boolean absorb(ItemStack stack) {
+        if (stack.isEmpty() || picker != Picker.NONE)
+            return false;
+        return switch (view) {
+            case FILTERS -> addFilter(stack);
+            case LOOK -> setMaterial(stack);
+            default -> false;
+        };
+    }
+
+    private boolean addFilter(ItemStack stack) {
+        if (tab == TransportType.ENERGY)
+            return false;
+        String id = idOf(stack);
+        if (id == null)
+            return false;
+        FilterSet filter = config.transport(tab).filter();
+        if (filter.advanced()) {
+            if (filter.rules().stream().noneMatch(rule -> rule.expression().equals(id)))
+                addRule(id);
+            return true;
+        }
+        if (!filter.entries().contains(id) && filter.entries().size() < PipeData.tier(menu.tier()).filterSlots()) {
+            editFilter(f -> {
+                List<String> entries = new ArrayList<>(f.entries());
+                entries.add(id);
+                return new FilterSet(f.advanced(), f.whitelist(), entries, f.firstMatch(), f.rules());
+            });
+        }
+        return true;
+    }
+
+    private boolean setMaterial(ItemStack stack) {
+        if (!(stack.getItem() instanceof BlockItem block))
+            return false;
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block.getBlock());
+        if (Appearance.allowed(id))
+            editLook(current -> current.withMaterial(Optional.of(id)));
+        return true;
+    }
+
+    @Override
+    protected void slotClicked(Slot slot, int slotId, int mouseButton, ClickType type) {
+        if (slot != null && slot.hasItem() && absorb(slot.getItem()))
+            return;
+        super.slotClicked(slot, slotId, mouseButton, type);
+    }
+
+    private boolean inPanel(double mouseX, double mouseY) {
+        return mouseX >= x(LEFT) && mouseX < x(LEFT + FULL_WIDTH) && mouseY >= y(ROW_1)
+                && mouseY < y(RULE_CONTROLS_Y + BUTTON_HEIGHT);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button))
             return true;
-        if (view == View.LOOK && clickLook(mouseX, mouseY))
+        if (picker != Picker.NONE)
+            return clickDestination(mouseX, mouseY);
+        if (view == View.LOOK && clickSwatch(mouseX, mouseY))
             return true;
-        if (simpleFilterShown() && clickGhost(mouseX, mouseY, button))
+        if (simpleFilterShown() && menu.getCarried().isEmpty() && clickGhost(mouseX, mouseY))
             return true;
-        if (advancedFilterShown() && picker == Picker.NONE && clickRuleRow(mouseX, mouseY))
+        if (advancedFilterShown() && clickRuleRow(mouseX, mouseY, button))
             return true;
-        return picker != Picker.NONE && clickDestination(mouseX, mouseY);
+        return inPanel(mouseX, mouseY) && absorb(menu.getCarried());
     }
 
-    private boolean clickGhost(double mouseX, double mouseY, int button) {
-        int slots = PipeData.tier(menu.tier()).filterSlots();
-        for (int i = 0; i < Math.min(slots, GHOST_COLUMNS); i++) {
+    private int ghostX(int index) {
+        return x(LEFT + index * SLOT_SIZE);
+    }
+
+    private int ghostY() {
+        return y(ROW_4);
+    }
+
+    /** With an empty hand, a click on an entry removes it. */
+    private boolean clickGhost(double mouseX, double mouseY) {
+        List<String> entries = config.transport(tab).filter().entries();
+        for (int i = 0; i < entries.size(); i++) {
             if (mouseX < ghostX(i) || mouseX >= ghostX(i) + SLOT_SIZE || mouseY < ghostY() || mouseY >= ghostY() + SLOT_SIZE)
                 continue;
-            ItemStack carried = menu.getCarried();
             int index = i;
-            if (carried.isEmpty() || button != 0) {
-                editFilter(f -> {
-                    List<String> entries = new ArrayList<>(f.entries());
-                    if (index < entries.size())
-                        entries.remove(index);
-                    return new FilterSet(f.advanced(), f.whitelist(), entries, f.firstMatch(), f.rules());
-                });
-            } else {
-                String id = idOf(carried);
-                if (id != null) {
-                    editFilter(f -> {
-                        List<String> entries = new ArrayList<>(f.entries());
-                        if (!entries.contains(id)) {
-                            if (index < entries.size())
-                                entries.set(index, id);
-                            else
-                                entries.add(id);
-                        }
-                        return new FilterSet(f.advanced(), f.whitelist(), entries, f.firstMatch(), f.rules());
-                    });
-                }
-            }
+            editFilter(f -> {
+                List<String> remaining = new ArrayList<>(f.entries());
+                remaining.remove(index);
+                return new FilterSet(f.advanced(), f.whitelist(), remaining, f.firstMatch(), f.rules());
+            });
             return true;
         }
         return false;
     }
 
-    private boolean clickRuleRow(double mouseX, double mouseY) {
-        List<FilterSet.Rule> rules = config.transport(tab).filter().rules();
-        for (int row = 0; row < RULE_ROWS; row++) {
-            int index = scroll + row;
-            int y = topPos + ROW_LIST_Y + row * ROW_HEIGHT;
-            if (index < rules.size() && mouseX >= leftPos + LEFT && mouseX < leftPos + LEFT + FULL_WIDTH && mouseY >= y
-                    && mouseY < y + ROW_HEIGHT) {
-                selectedRule = index;
-                rebuild();
+    private boolean clickSwatch(double mouseX, double mouseY) {
+        for (int i = 0; i < DYES.length; i++) {
+            if (mouseX >= swatchX(i) && mouseX < swatchX(i) + SWATCH_SIZE && mouseY >= swatchY(i)
+                    && mouseY < swatchY(i) + SWATCH_SIZE) {
+                int color = rgb(DYES[i]);
+                editLook(current -> accentTarget ? current.withAccent(color) : current.withTint(color));
                 return true;
             }
         }
         return false;
     }
 
-    private boolean clickDestination(double mouseX, double mouseY) {
-        List<BlockPos> targets = menu.destinations();
+    /** Left click selects a rule; right click switches it on or off. */
+    private boolean clickRuleRow(double mouseX, double mouseY, int button) {
+        List<FilterSet.Rule> rules = config.transport(tab).filter().rules();
         for (int row = 0; row < RULE_ROWS; row++) {
             int index = scroll + row;
-            int y = topPos + ROW_LIST_Y + row * ROW_HEIGHT;
-            if (index >= targets.size() || mouseX < leftPos + LEFT || mouseX >= leftPos + LEFT + FULL_WIDTH || mouseY < y
-                    || mouseY >= y + ROW_HEIGHT)
+            int rowY = y(ROW_3 + row * LIST_ROW_HEIGHT);
+            if (index >= rules.size() || mouseX < x(LEFT) || mouseX >= x(LEFT + FULL_WIDTH) || mouseY < rowY
+                    || mouseY >= rowY + LIST_ROW_HEIGHT)
+                continue;
+            if (button == 1)
+                updateRule(index, r -> new FilterSet.Rule(r.expression(), r.allow(), r.scope(), r.limit(), !r.enabled()));
+            selectedRule = index;
+            rebuild();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean clickDestination(double mouseX, double mouseY) {
+        List<BlockPos> targets = menu.destinations();
+        for (int row = 0; row < PICKER_ROWS; row++) {
+            int index = scroll + row;
+            int rowY = y(ROW_2 + row * LIST_ROW_HEIGHT);
+            if (index >= targets.size() || mouseX < x(LEFT) || mouseX >= x(LEFT + FULL_WIDTH) || mouseY < rowY
+                    || mouseY >= rowY + LIST_ROW_HEIGHT)
                 continue;
             BlockPos target = targets.get(index);
-            if (picker == Picker.PRIORITY) {
+            if (picker == Picker.PRIORITY)
                 edit(c -> c.withPriority(toggled(c.priority(), target)));
-            } else if (selectedRule >= 0) {
+            else
                 updateRule(selectedRule, r -> new FilterSet.Rule(r.expression(), r.allow(), toggled(r.scope(), target),
                         r.limit(), r.enabled()));
-            }
             return true;
         }
         return false;
@@ -580,8 +615,21 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int size = picker != Picker.NONE ? menu.destinations().size() : config.transport(tab).filter().rules().size();
-        scroll = Math.max(0, Math.min(Math.max(0, size - RULE_ROWS), scroll - (int) Math.signum(scrollY)));
+        int rows = picker != Picker.NONE ? PICKER_ROWS : RULE_ROWS;
+        scroll = Math.max(0, Math.min(Math.max(0, size - rows), scroll - (int) Math.signum(scrollY)));
         return true;
+    }
+
+    private int swatchX(int index) {
+        return x(LEFT + (index % SWATCH_COLUMNS) * SWATCH_STEP);
+    }
+
+    private int swatchY(int index) {
+        return y(ROW_1 + (index / SWATCH_COLUMNS) * SWATCH_STEP);
+    }
+
+    private static int rgb(DyeColor dye) {
+        return dye.getTextureDiffuseColor() & Appearance.RGB_MASK;
     }
 
     @Override
@@ -589,26 +637,38 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         graphics.blitSprite(PANEL, leftPos, topPos, imageWidth, imageHeight);
         for (Slot slot : menu.slots)
             graphics.blitSprite(SLOT, leftPos + slot.x - 1, topPos + slot.y - 1, SLOT_SIZE, SLOT_SIZE);
-        if (view == View.LOOK)
-            drawLook(graphics);
-        if (simpleFilterShown())
-            drawGhosts(graphics);
         if (picker != Picker.NONE)
             drawDestinations(graphics);
+        else if (view == View.LOOK)
+            drawLook(graphics);
+        else if (simpleFilterShown())
+            drawGhosts(graphics);
         else if (advancedFilterShown())
             drawRules(graphics);
+    }
+
+    private void drawLook(GuiGraphics graphics) {
+        int selected = accentTarget ? look.accent() : look.tint();
+        for (int i = 0; i < DYES.length; i++) {
+            int swatchX = swatchX(i);
+            int swatchY = swatchY(i);
+            boolean chosen = selected == rgb(DYES[i]);
+            graphics.fill(swatchX - 1, swatchY - 1, swatchX + SWATCH_SIZE + 1, swatchY + SWATCH_SIZE + 1,
+                    chosen ? TITLE : ROW_FILL);
+            graphics.fill(swatchX, swatchY, swatchX + SWATCH_SIZE, swatchY + SWATCH_SIZE, rgb(DYES[i]) | OPAQUE);
+        }
+        graphics.blitSprite(SLOT, x(LEFT), y(LOOK_MATERIAL_Y), SLOT_SIZE, SLOT_SIZE);
+        look.material().map(BuiltInRegistries.BLOCK::get).ifPresent(block -> graphics.renderFakeItem(
+                new ItemStack(block), x(LEFT) + 1, y(LOOK_MATERIAL_Y) + 1));
     }
 
     private void drawGhosts(GuiGraphics graphics) {
         List<String> entries = config.transport(tab).filter().entries();
         int slots = Math.min(PipeData.tier(menu.tier()).filterSlots(), GHOST_COLUMNS);
-        for (int i = 0; i < GHOST_COLUMNS; i++) {
+        for (int i = 0; i < slots; i++) {
             graphics.blitSprite(SLOT, ghostX(i), ghostY(), SLOT_SIZE, SLOT_SIZE);
-            if (i >= slots) {
-                graphics.fill(ghostX(i) + 1, ghostY() + 1, ghostX(i) + SLOT_SIZE - 1, ghostY() + SLOT_SIZE - 1, MUTED);
-            } else if (i < entries.size()) {
+            if (i < entries.size())
                 graphics.renderFakeItem(displayStack(entries.get(i)), ghostX(i) + 1, ghostY() + 1);
-            }
         }
     }
 
@@ -616,15 +676,17 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         List<FilterSet.Rule> rules = config.transport(tab).filter().rules();
         for (int row = 0; row < RULE_ROWS; row++) {
             int index = scroll + row;
-            int y = topPos + ROW_LIST_Y + row * ROW_HEIGHT;
-            graphics.fill(leftPos + LEFT, y, leftPos + LEFT + FULL_WIDTH, y + ROW_HEIGHT - 1, SLOT_FILL);
+            int rowY = y(ROW_3 + row * LIST_ROW_HEIGHT);
+            graphics.fill(x(LEFT), rowY, x(LEFT + FULL_WIDTH), rowY + LIST_ROW_HEIGHT - 1,
+                    index == selectedRule ? ROW_SELECTED : ROW_FILL);
             if (index >= rules.size())
                 continue;
             FilterSet.Rule rule = rules.get(index);
-            int color = !rule.enabled() ? MUTED : !Expr.isValid(rule.expression()) ? NEGATIVE : rule.allow() ? POSITIVE : VALUE;
-            String label = (rule.allow() ? "+ " : "- ") + rule.expression();
-            graphics.drawString(font, font.plainSubstrByWidth(label, FULL_WIDTH - PRESENT_LIMIT_SLACK), leftPos + LEFT + 3,
-                    y + 2, index == selectedRule ? TITLE : color, true);
+            int color = !rule.enabled() ? DISABLED : !Expr.isValid(rule.expression()) ? NEGATIVE
+                    : rule.allow() ? POSITIVE : DENY;
+            String marker = !rule.enabled() ? "x " : rule.allow() ? "+ " : "- ";
+            graphics.drawString(font, font.plainSubstrByWidth(marker + rule.expression(), FULL_WIDTH - 2 * TEXT_INSET),
+                    x(LEFT) + TEXT_INSET, rowY + 2, color, false);
         }
     }
 
@@ -634,49 +696,42 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
                 : selectedRule >= 0 && selectedRule < config.transport(tab).filter().rules().size()
                         ? config.transport(tab).filter().rules().get(selectedRule).scope()
                         : List.of();
-        for (int row = 0; row < RULE_ROWS; row++) {
+        for (int row = 0; row < PICKER_ROWS; row++) {
             int index = scroll + row;
-            int y = topPos + ROW_LIST_Y + row * ROW_HEIGHT;
-            graphics.fill(leftPos + LEFT, y, leftPos + LEFT + FULL_WIDTH, y + ROW_HEIGHT - 1, SLOT_FILL);
+            int rowY = y(ROW_2 + row * LIST_ROW_HEIGHT);
+            graphics.fill(x(LEFT), rowY, x(LEFT + FULL_WIDTH), rowY + LIST_ROW_HEIGHT - 1, ROW_FILL);
             if (index >= targets.size())
                 continue;
             BlockPos target = targets.get(index);
             int rank = chosen.indexOf(target);
             String label = (rank >= 0 ? (picker == Picker.PRIORITY ? (rank + 1) + ". " : "+ ") : "  ")
                     + target.getX() + " " + target.getY() + " " + target.getZ();
-            graphics.drawString(font, label, leftPos + LEFT + 3, y + 2, rank >= 0 ? POSITIVE : SECONDARY, true);
+            graphics.drawString(font, label, x(LEFT) + TEXT_INSET, rowY + 2, rank >= 0 ? POSITIVE : TITLE, false);
         }
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY, TITLE, true);
-        graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, TITLE, true);
-        if (view == View.LOOK) {
-            look.material().map(BuiltInRegistries.BLOCK::get).ifPresentOrElse(
-                    block -> graphics.drawString(font, block.getName(), LEFT + SLOT_SIZE + 4, ROW_MATERIAL + 5, VALUE, true),
-                    () -> graphics.drawString(font, text("material"), LEFT + SLOT_SIZE + 4, ROW_MATERIAL + 5, SECONDARY, true));
-        } else if (view == View.SETTINGS && picker == Picker.PRIORITY) {
-            graphics.drawString(font, text("order.hint"), LEFT, ROW_CONTENT + 4, SECONDARY, true);
-        } else if (view == View.SETTINGS) {
-            graphics.drawString(font, text("keep"), LEFT, ROW_LABELS, SECONDARY, true);
-            graphics.drawString(font, text("stop"), RIGHT, ROW_LABELS, SECONDARY, true);
-            graphics.drawString(font, statusLine(), LEFT, ROW_STATUS, statusColor(), true);
-        } else if (tab == TransportType.ENERGY) {
-            graphics.drawString(font, text("energy.nofilter"), LEFT, ROW_CONTENT, MUTED, true);
+        graphics.drawString(font, title, titleLabelX, titleLabelY, TITLE, false);
+        graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, TITLE, false);
+        Component status = Component.translatable(shownStatus.translationKey());
+        graphics.drawString(font, status, LEFT + FULL_WIDTH - font.width(status), titleLabelY, statusColor(), false);
+        if (picker != Picker.NONE) {
+            graphics.drawString(font, text(picker == Picker.PRIORITY ? "order.hint" : "scope.hint"), LEFT,
+                    ROW_1 + TEXT_DROP, SECONDARY, false);
+        } else if (view == View.LOOK) {
+            Component name = look.material().map(BuiltInRegistries.BLOCK::get).map(block -> block.getName())
+                    .orElse(text("hint.material").copy());
+            graphics.drawString(font, name, LEFT + MATERIAL_LABEL, LOOK_MATERIAL_Y + 5,
+                    look.material().isPresent() ? TITLE : SECONDARY, false);
+        } else if (view == View.FILTERS && tab == TransportType.ENERGY) {
+            graphics.drawString(font, text("energy.nofilter"), LEFT, ROW_2 + TEXT_DROP, SECONDARY, false);
         } else if (simpleFilterShown()) {
-            int limit = PipeData.tier(menu.tier()).filterSlots();
-            graphics.drawString(font, Component.translatable("gui.universal_pipes.slots", limit), LEFT, ROW_CONTENT + 18,
-                    SECONDARY, true);
-        } else if (picker == Picker.NONE) {
-            int max = PipeData.tier(menu.tier()).maxRules();
-            graphics.drawString(font, Component.translatable("gui.universal_pipes.rules",
-                    config.transport(tab).filter().rules().size(), max), LEFT, ROW_CONTENT + 18, SECONDARY, true);
+            graphics.drawString(font, text("hint.add"), LEFT, ROW_3 + TEXT_DROP, SECONDARY, false);
+            graphics.drawString(font, Component.translatable("gui.universal_pipes.count",
+                    config.transport(tab).filter().entries().size(), PipeData.tier(menu.tier()).filterSlots()), LEFT,
+                    ROW_5 + TEXT_DROP, SECONDARY, false);
         }
-    }
-
-    private Component statusLine() {
-        return Component.translatable(shownStatus.translationKey());
     }
 
     private int statusColor() {

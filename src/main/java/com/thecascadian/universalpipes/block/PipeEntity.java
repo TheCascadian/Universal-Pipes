@@ -12,6 +12,7 @@ import com.thecascadian.universalpipes.core.Targets;
 import com.thecascadian.universalpipes.core.Transfer;
 import com.thecascadian.universalpipes.core.TransportType;
 import com.thecascadian.universalpipes.data.PipeData;
+import com.thecascadian.universalpipes.net.Payloads;
 import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -19,10 +20,8 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -33,6 +32,7 @@ import net.neoforged.neoforge.client.model.data.ModelData;
 import net.neoforged.neoforge.client.model.data.ModelProperty;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 
@@ -65,7 +65,6 @@ public class PipeEntity extends BlockEntity {
 
     /** Read by the baked model wrapper to swap the sprite of a pipe that has a material. */
     public static final ModelProperty<Appearance> APPEARANCE_PROPERTY = new ModelProperty<>();
-    private static final String APPEARANCE_KEY = "appearance";
     private static final int GLOW_LIGHT = 7;
 
     /** Transient per face scheduling and cache state. */
@@ -131,19 +130,34 @@ public class PipeEntity extends BlockEntity {
     }
 
     /**
-     * The look is mirrored to clients with a dedicated update tag, because the
-     * face configuration (filters included) is not needed for rendering. A light
-     * recheck is queued as well, as glow is read from the block entity.
+     * The client has no block entity for a pipe by itself: chunk loading creates
+     * one through newBlockEntity, which returns null so that passive pipes stay
+     * free of entities on the server. A look is therefore mirrored to the
+     * clients tracking the chunk by an explicit payload, and the client creates
+     * its own entity when that payload arrives. Glow is read from the entity, so
+     * a light recheck is queued as well.
      */
     public void setAppearance(Appearance value) {
         if (appearance.equals(value))
             return;
         appearance = value;
         setChanged();
-        if (level != null) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        if (level == null)
+            return;
+        if (level.isClientSide) {
+            if (level.getModelDataManager() != null)
+                level.getModelDataManager().requestRefresh(this);
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_ALL);
+        } else {
             level.getLightEngine().checkBlock(worldPosition);
+            syncAppearance();
         }
+    }
+
+    public void syncAppearance() {
+        if (level instanceof ServerLevel server)
+            PacketDistributor.sendToPlayersTrackingChunk(server, new ChunkPos(worldPosition),
+                    new Payloads.AppearanceSync(Map.of(worldPosition, appearance)));
     }
 
     public int lightEmission() {
@@ -153,56 +167,6 @@ public class PipeEntity extends BlockEntity {
     @Override
     public ModelData getModelData() {
         return ModelData.builder().with(APPEARANCE_PROPERTY, appearance).build();
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        CompoundTag tag = new CompoundTag();
-        Appearance.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), appearance).result()
-                .ifPresent(encoded -> tag.put(APPEARANCE_KEY, encoded));
-        return tag;
-    }
-
-    @Override
-    public Packet<ClientGamePacketListener> getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
-    }
-
-    @Override
-    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
-        if (!tag.contains(APPEARANCE_KEY))
-            return;
-        Appearance.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get(APPEARANCE_KEY)).result()
-                .ifPresent(parsed -> appearance = parsed);
-        if (level != null && level.getModelDataManager() != null)
-            level.getModelDataManager().requestRefresh(this);
-    }
-
-    public EndpointConfig config(Direction face) {
-        return faces.get(face);
-    }
-
-    public void setExtract(Direction face, EndpointConfig config) {
-        if (config == null) {
-            faces.remove(face);
-            runtimes.remove(face);
-        } else {
-            faces.put(face, config);
-        }
-        changed();
-    }
-
-    /** Applies a validated configuration and wakes the face so the change acts at once. */
-    public void updateConfig(Direction face, EndpointConfig config) {
-        if (!faces.containsKey(face))
-            return;
-        faces.put(face, config);
-        Runtime runtime = runtimes.get(face);
-        if (runtime != null) {
-            runtime.ordered = null;
-            runtime.nextRun = 0L;
-        }
-        setChanged();
     }
 
     public Status status(Direction face) {
