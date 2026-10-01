@@ -3,6 +3,7 @@ package com.thecascadian.universalpipes.core;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.thecascadian.universalpipes.UniversalPipes;
+import com.thecascadian.universalpipes.config.PipesConfig;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -59,8 +60,9 @@ public record Appearance(int tint, int accent, Optional<ResourceLocation> materi
 
     /** Whether a block may serve as a material under the current datapack tag. */
     public static boolean allowed(ResourceLocation id) {
-        return BuiltInRegistries.BLOCK.getOptional(id).map(block -> block.defaultBlockState().is(MATERIALS))
-                .orElse(false);
+        return PipesConfig.materialAllowed(id.toString())
+                && BuiltInRegistries.BLOCK.getOptional(id).map(block -> block.defaultBlockState().is(MATERIALS))
+                        .orElse(false);
     }
 
     /** Server side: colours are masked to RGB and a disallowed material is dropped. */

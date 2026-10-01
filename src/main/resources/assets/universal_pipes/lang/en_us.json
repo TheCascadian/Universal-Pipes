@@ -93,5 +93,18 @@
     "gui.universal_pipes.material.caption": "Material: click a block below",
     "gui.universal_pipes.none": "None",
     "gui.universal_pipes.rule.hint": "Click to delete, right click to edit",
-    "message.universal_pipes.styled": "Styled %s pipes"
+    "message.universal_pipes.styled": "Styled %s pipes",
+    "gui.universal_pipes.throughput": "Moves %1$s items/s, %2$s mB/s, %3$s FE/s",
+    "gui.universal_pipes.locked": "This tier cannot use this feature",
+    "gui.universal_pipes.channels": "Channels",
+    "gui.universal_pipes.channels.merge": "Crosses channels",
+    "gui.universal_pipes.channels.own": "Own channel",
+    "gui.universal_pipes.channels.tooltip": "Own channel reaches only pipes of the same dye colour. Crosses channels also reaches pipes of other colours.",
+    "tooltip.universal_pipes.throughput": "Moves %1$s items/s, %2$s mB/s, %3$s FE/s",
+    "tooltip.universal_pipes.material": "Material: %s",
+    "tooltip.universal_pipes.styling": "Use dye, glow ink or a sneaking block on a pipe to style a whole line",
+    "tooltip.universal_pipes.styling.clear": "Use a water bucket on a pipe to clear its style",
+    "tooltip.universal_pipes.copied": "Holds copied endpoint settings",
+    "message.universal_pipes.copied": "Endpoint settings copied",
+    "message.universal_pipes.inspect": "%1$s pipes, %2$s endpoints, weakest tier %3$s, %4$s"
 }

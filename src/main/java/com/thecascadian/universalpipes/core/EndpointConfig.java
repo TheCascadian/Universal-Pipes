@@ -22,7 +22,7 @@ import java.util.Locale;
  * received copy without mutating anything it already holds.
  */
 public record EndpointConfig(Redstone redstone, Distribution distribution, List<BlockPos> priority,
-        Transport items, Transport fluids, Transport energy) {
+        Transport items, Transport fluids, Transport energy, boolean crossChannels) {
 
     public enum Redstone implements StringRepresentable {
         IGNORE, ON, OFF;
@@ -86,7 +86,8 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
             Transport.CODEC.optionalFieldOf("fluids", new Transport(false, 0, 0, FilterSet.EMPTY))
                     .forGetter(EndpointConfig::fluids),
             Transport.CODEC.optionalFieldOf("energy", new Transport(false, 0, 0, FilterSet.EMPTY))
-                    .forGetter(EndpointConfig::energy))
+                    .forGetter(EndpointConfig::energy),
+            Codec.BOOL.optionalFieldOf("cross_channels", false).forGetter(EndpointConfig::crossChannels))
             .apply(i, EndpointConfig::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, EndpointConfig> STREAM_CODEC = ByteBufCodecs
@@ -101,7 +102,7 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
                 List.of(),
                 new Transport(defaults.items(), 0, 0, FilterSet.EMPTY),
                 new Transport(defaults.fluids(), 0, 0, FilterSet.EMPTY),
-                new Transport(defaults.energy(), 0, 0, FilterSet.EMPTY));
+                new Transport(defaults.energy(), 0, 0, FilterSet.EMPTY), false);
     }
 
     private static <E extends Enum<E> & StringRepresentable> E parse(E[] values, String name, E fallback) {
@@ -113,27 +114,31 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
     }
 
     public EndpointConfig withRedstone(Redstone value) {
-        return new EndpointConfig(value, distribution, priority, items, fluids, energy);
+        return new EndpointConfig(value, distribution, priority, items, fluids, energy, crossChannels);
     }
 
     public EndpointConfig withDistribution(Distribution value) {
-        return new EndpointConfig(redstone, value, priority, items, fluids, energy);
+        return new EndpointConfig(redstone, value, priority, items, fluids, energy, crossChannels);
+    }
+
+    public EndpointConfig withCrossChannels(boolean value) {
+        return new EndpointConfig(redstone, distribution, priority, items, fluids, energy, value);
     }
 
     public EndpointConfig withPriority(List<BlockPos> value) {
-        return new EndpointConfig(redstone, distribution, value, items, fluids, energy);
+        return new EndpointConfig(redstone, distribution, value, items, fluids, energy, crossChannels);
     }
 
     public EndpointConfig withItems(Transport value) {
-        return new EndpointConfig(redstone, distribution, priority, value, fluids, energy);
+        return new EndpointConfig(redstone, distribution, priority, value, fluids, energy, crossChannels);
     }
 
     public EndpointConfig withFluids(Transport value) {
-        return new EndpointConfig(redstone, distribution, priority, items, value, energy);
+        return new EndpointConfig(redstone, distribution, priority, items, value, energy, crossChannels);
     }
 
     public EndpointConfig withEnergy(Transport value) {
-        return new EndpointConfig(redstone, distribution, priority, items, fluids, value);
+        return new EndpointConfig(redstone, distribution, priority, items, fluids, value, crossChannels);
     }
 
     public Transport transport(TransportType type) {
@@ -168,7 +173,34 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
         return new EndpointConfig(redstone, distribution, order,
                 sanitize(items, limits, spec, false),
                 sanitize(fluids, limits, spec, false),
-                sanitize(energy, limits, spec, true));
+                sanitize(energy, limits, spec, true), crossChannels);
+    }
+
+    /**
+     * The configuration as it acts at a given tier when feature gating is on. It is
+     * applied when running and never written back, so a pipe that is upgraded later
+     * regains what the player had configured instead of losing it.
+     */
+    public EndpointConfig gated(int tier) {
+        PipeData.Limits limits = PipeData.limits();
+        boolean advanced = tier >= limits.minTierAdvancedFilters();
+        boolean stock = tier >= limits.minTierStockLimits();
+        return new EndpointConfig(redstone, distribution, priority, gated(items, advanced, stock),
+                gated(fluids, advanced, stock), gated(energy, advanced, stock), crossChannels);
+    }
+
+    private static Transport gated(Transport transport, boolean advanced, boolean stock) {
+        FilterSet filter = transport.filter();
+        if (!advanced && filter.advanced())
+            filter = new FilterSet(false, filter.whitelist(), filter.entries(), filter.firstMatch(), List.of());
+        else if (!stock) {
+            List<FilterSet.Rule> rules = new ArrayList<>();
+            for (FilterSet.Rule rule : filter.rules())
+                rules.add(new FilterSet.Rule(rule.expression(), rule.allow(), rule.scope(), 0, rule.enabled()));
+            filter = new FilterSet(filter.advanced(), filter.whitelist(), filter.entries(), filter.firstMatch(), rules);
+        }
+        return stock ? new Transport(transport.enabled(), transport.keepInSource(), transport.stopAtDestination(), filter)
+                : new Transport(transport.enabled(), 0, 0, filter);
     }
 
     private static Transport sanitize(Transport transport, PipeData.Limits limits, PipeData.TierSpec spec,

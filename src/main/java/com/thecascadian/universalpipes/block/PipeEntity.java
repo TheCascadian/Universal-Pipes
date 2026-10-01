@@ -207,13 +207,27 @@ public class PipeEntity extends BlockEntity {
     public List<BlockPos> destinations(Direction face) {
         if (!(level instanceof ServerLevel server))
             return List.of();
-        PipeNetworks.Topology topology = PipeNetworks.discover(server, worldPosition, face, PipeNetworks.epoch(server));
+        PipeNetworks.Topology topology = PipeNetworks.discover(server, worldPosition, face, PipeNetworks.epoch(server),
+                crossChannels(face));
         List<BlockPos> result = new ArrayList<>();
         for (PipeNetworks.Destination destination : topology.destinations()) {
             if (!result.contains(destination.target()))
                 result.add(destination.target());
         }
         return result;
+    }
+
+    private boolean crossChannels(Direction face) {
+        EndpointConfig config = faces.get(face);
+        return config != null && config.crossChannels();
+    }
+
+    /** The strongest comparator signal over the faces, so one working face is enough to read as active. */
+    public int signal() {
+        int strongest = 0;
+        for (Runtime runtime : runtimes.values())
+            strongest = Math.max(strongest, runtime.status.signal());
+        return strongest;
     }
 
     public void wakeAll() {
@@ -318,7 +332,10 @@ public class PipeEntity extends BlockEntity {
             if (now < runtime.nextRun)
                 continue;
             long started = System.nanoTime();
+            int signal = pipe.signal();
             pipe.process(server, entry.getKey(), entry.getValue(), runtime, now);
+            if (pipe.signal() != signal)
+                server.updateNeighbourForOutputSignal(pos, state.getBlock());
             long spent = System.nanoTime() - started;
             runtime.averageNanos += (spent - runtime.averageNanos) * AVERAGE_SMOOTHING;
             PipeNetworks.recordNanos(level, spent);
@@ -332,6 +349,7 @@ public class PipeEntity extends BlockEntity {
 
     private void process(ServerLevel level, Direction face, EndpointConfig config, Runtime runtime, long now) {
         PipeData.TierSpec spec = PipeData.tier(tier());
+        config = PipesConfig.tierGating() ? config.gated(tier()) : config;
         if (level.getServer().getAverageTickTimeNanos() / NANOS_PER_MILLI > PipesConfig.tickBudgetMs()) {
             idle(runtime, now, spec, Status.BUDGET_DEFERRED);
             return;
@@ -347,7 +365,8 @@ public class PipeEntity extends BlockEntity {
                 runtime.nextRun = now + 1;
                 return;
             }
-            PipeNetworks.Topology topology = PipeNetworks.discover(level, worldPosition, face, epoch);
+            PipeNetworks.Topology topology = PipeNetworks.discover(level, worldPosition, face, epoch,
+                    config.crossChannels());
             runtime.topology = topology;
             runtime.destinations = topology.destinations().stream()
                     .map(destination -> new Transfer.Dest(destination,

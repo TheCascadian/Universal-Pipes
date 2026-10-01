@@ -54,6 +54,9 @@ public final class PipeData extends SimpleJsonResourceReloadListener {
     private static final int DEFAULT_EXPRESSION_DEPTH = 6;
     private static final int DEFAULT_SCOPE = 16;
     private static final int DEFAULT_STOCK_CAP = 1_000_000;
+    private static final int DEFAULT_BRIDGE_TIER = 4;
+    private static final int DEFAULT_BRIDGE_GAP = 2;
+    private static final int BRIDGE_GAP_CAP = 8;
 
     private static volatile Snapshot current = Snapshot.parse(new JsonObject());
 
@@ -61,11 +64,24 @@ public final class PipeData extends SimpleJsonResourceReloadListener {
 
     public record TierSpec(int itemsPerOp, int intervalTicks, int fluidPerOp, int energyPerTick, int filterSlots,
             int maxRules) {
+
+        private static final int TICKS_PER_SECOND = 20;
+
+        /** Rate of a per operation amount in units per second at this tier's interval. */
+        public long perSecond(int amount) {
+            return (long) amount * TICKS_PER_SECOND / intervalTicks;
+        }
+
+        /** Energy is already stated per tick, so only the tick rate applies. */
+        public long energyPerSecond() {
+            return (long) energyPerTick * TICKS_PER_SECOND;
+        }
     }
 
     /** Feature table: the tier a feature needs once tier_feature_gating is on. */
     public record Limits(int maxExpressionLength, int maxExpressionDepth, int maxScopeTargets, int maxStock,
-            int minTierFluids, int minTierEnergy, int minTierAdvancedFilters, int minTierStockLimits) {
+            int minTierFluids, int minTierEnergy, int minTierAdvancedFilters, int minTierStockLimits,
+            int minTierBridging, int bridgeGap) {
     }
 
     public record Defaults(String redstone, String distribution, boolean items, boolean fluids, boolean energy) {
@@ -100,7 +116,9 @@ public final class PipeData extends SimpleJsonResourceReloadListener {
                     number(minTier, "fluids", 1, 1, TIER_COUNT),
                     number(minTier, "energy", 1, 1, TIER_COUNT),
                     number(minTier, "advanced_filters", 1, 1, TIER_COUNT),
-                    number(minTier, "stock_limits", 1, 1, TIER_COUNT));
+                    number(minTier, "stock_limits", 1, 1, TIER_COUNT),
+                    number(minTier, "bridging", DEFAULT_BRIDGE_TIER, 1, TIER_COUNT),
+                    number(limitsRoot, "bridge_gap", DEFAULT_BRIDGE_GAP, 1, BRIDGE_GAP_CAP));
             JsonObject defaultsRoot = object(root, DEFAULTS);
             Defaults defaults = new Defaults(
                     text(defaultsRoot, "redstone", "ignore"),

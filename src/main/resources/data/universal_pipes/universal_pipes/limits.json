@@ -7,6 +7,8 @@
         "fluids": 1,
         "energy": 1,
         "advanced_filters": 1,
-        "stock_limits": 1
-    }
+        "stock_limits": 1,
+        "bridging": 4
+    },
+    "bridge_gap": 2
 }
