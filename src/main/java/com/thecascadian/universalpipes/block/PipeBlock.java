@@ -1,5 +1,6 @@
 package com.thecascadian.universalpipes.block;
 
+import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
 import com.thecascadian.universalpipes.core.Targets;
@@ -88,6 +89,15 @@ public class PipeBlock extends Block implements EntityBlock {
         FACES.values().forEach(builder::add);
     }
 
+    /**
+     * The dye colour acts as a channel: pipes only join pipes of the same colour,
+     * and undyed pipes form their own channel. It reuses the appearance, so
+     * isolating parallel lines needs no blockstate property and no extra item.
+     */
+    private static int channel(Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe.appearance().tint() : Appearance.UNSET;
+    }
+
     /** Recomputes the six face values from the neighbourhood and the block entity. */
     public static BlockState computeState(Level level, BlockPos pos, BlockState current) {
         PipeEntity self = level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe : null;
@@ -104,6 +114,7 @@ public class PipeBlock extends Block implements EntityBlock {
             } else if (level.getBlockState(next).getBlock() instanceof PipeBlock) {
                 boolean blocked = level.getBlockEntity(next) instanceof PipeEntity other
                         && (other.isDisabled(face.getOpposite()) || other.isExtract(face.getOpposite()));
+                blocked |= PipesConfig.dyeChannels() && channel(level, pos) != channel(level, next);
                 value = blocked ? Connection.NONE : Connection.CONNECTED;
             } else {
                 value = Targets.connectable(level, pos, face) ? Connection.CONNECTED : Connection.NONE;

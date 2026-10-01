@@ -31,6 +31,9 @@ public final class PipesConfig {
     private static final ModConfigSpec.IntValue UPGRADE_BLOCKS = SERVER
             .comment("Maximum pipes changed by one sneak-use of a Pipe Upgrade. Live.")
             .defineInRange("network_upgrade_max_blocks", DEFAULT_UPGRADE_BLOCKS, 1, 4096);
+    private static final ModConfigSpec.BooleanValue DYE_CHANNELS = SERVER
+            .comment("Pipes of different dye colours do not connect, so parallel lines can touch. Live.")
+            .define("dye_channels", true);
     private static final ModConfigSpec.IntValue PAINT_BLOCKS = SERVER
             .comment("Maximum pipes styled by one use of a dye, glow ink sac, material block or water bucket. Live.")
             .defineInRange("paint_max_blocks", DEFAULT_PAINT_BLOCKS, 1, 4096);
@@ -83,6 +86,10 @@ public final class PipesConfig {
 
     public static boolean tierGating() {
         return read(TIER_GATING);
+    }
+
+    public static boolean dyeChannels() {
+        return read(DYE_CHANNELS);
     }
 
     public static int paintMaxBlocks() {

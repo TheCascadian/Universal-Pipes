@@ -38,6 +38,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -116,28 +117,41 @@ public final class PipeInteractions {
      */
     private static void paint(ServerLevel level, BlockPos start, Player player, ItemStack stack) {
         boolean clear = stack.is(Items.WATER_BUCKET);
+        List<BlockPos> line = line(level, start, PipesConfig.paintMaxBlocks());
+        int changed = 0;
+        for (BlockPos current : line) {
+            Appearance before = appearanceAt(level, current);
+            Appearance next = clear ? Appearance.NONE : styled(before, stack);
+            if (next == null || next.equals(before))
+                continue;
+            if (!clear && stack.isEmpty() && !player.getAbilities().instabuild)
+                break;
+            PipeBlock.entityFor(level, current).setAppearance(next);
+            if (clear)
+                PipeBlock.refresh(level, current);
+            else
+                consume(player, stack);
+            changed++;
+        }
+        if (changed > 0)
+            level.playSound(null, start, clear ? SoundEvents.BUCKET_EMPTY : SoundEvents.DYE_USE, SoundSource.BLOCKS,
+                    SOUND_VOLUME, SOUND_PITCH);
+        player.displayClientMessage(Component.translatable("message.universal_pipes.styled", changed), true);
+    }
+
+    /**
+     * The connected line is collected before anything changes, because recolouring
+     * a pipe may disconnect it from its neighbours and would cut the walk short.
+     */
+    private static List<BlockPos> line(ServerLevel level, BlockPos start, int limit) {
         Set<BlockPos> seen = new HashSet<>();
+        List<BlockPos> order = new ArrayList<>();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         seen.add(start);
         queue.add(start);
-        int visited = 0;
-        int changed = 0;
-        int limit = PipesConfig.paintMaxBlocks();
-        while (!queue.isEmpty() && visited < limit) {
+        while (!queue.isEmpty() && order.size() < limit) {
             BlockPos current = queue.poll();
-            visited++;
-            Appearance before = appearanceAt(level, current);
-            Appearance next = clear ? Appearance.NONE : styled(before, stack);
-            if (next != null && !next.equals(before)) {
-                if (!clear && stack.isEmpty() && !player.getAbilities().instabuild)
-                    break;
-                PipeBlock.entityFor(level, current).setAppearance(next);
-                if (clear)
-                    PipeBlock.refresh(level, current);
-                else
-                    consume(player, stack);
-                changed++;
-            }
+            order.add(current);
             BlockState state = level.getBlockState(current);
             for (Direction face : Direction.values()) {
                 BlockPos neighbour = current.relative(face);
@@ -146,10 +160,7 @@ public final class PipeInteractions {
                     queue.add(neighbour);
             }
         }
-        if (changed > 0)
-            level.playSound(null, start, clear ? SoundEvents.BUCKET_EMPTY : SoundEvents.DYE_USE, SoundSource.BLOCKS,
-                    SOUND_VOLUME, SOUND_PITCH);
-        player.displayClientMessage(Component.translatable("message.universal_pipes.styled", changed), true);
+        return order;
     }
 
     private static Appearance appearanceAt(ServerLevel level, BlockPos pos) {

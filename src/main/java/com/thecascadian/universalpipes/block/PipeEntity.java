@@ -167,6 +167,7 @@ public class PipeEntity extends BlockEntity {
     public void setAppearance(Appearance value) {
         if (appearance.equals(value))
             return;
+        boolean recolored = appearance.tint() != value.tint();
         appearance = value;
         setChanged();
         if (level == null)
@@ -178,6 +179,8 @@ public class PipeEntity extends BlockEntity {
         } else {
             level.getLightEngine().checkBlock(worldPosition);
             syncAppearance();
+            if (recolored)
+                PipeBlock.refresh(level, worldPosition);
         }
     }
 
