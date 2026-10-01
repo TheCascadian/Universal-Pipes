@@ -11,6 +11,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class PipesConfig {
 
     private static final int DEFAULT_UPGRADE_BLOCKS = 64;
+    private static final int DEFAULT_PAINT_BLOCKS = 64;
     private static final int DEFAULT_MAX_NODES = 512;
     private static final double DEFAULT_TICK_BUDGET_MS = 35.0;
     private static final int DEFAULT_BACKOFF_CEILING = 80;
@@ -30,6 +31,9 @@ public final class PipesConfig {
     private static final ModConfigSpec.IntValue UPGRADE_BLOCKS = SERVER
             .comment("Maximum pipes changed by one sneak-use of a Pipe Upgrade. Live.")
             .defineInRange("network_upgrade_max_blocks", DEFAULT_UPGRADE_BLOCKS, 1, 4096);
+    private static final ModConfigSpec.IntValue PAINT_BLOCKS = SERVER
+            .comment("Maximum pipes styled by one use of a dye, glow ink sac, material block or water bucket. Live.")
+            .defineInRange("paint_max_blocks", DEFAULT_PAINT_BLOCKS, 1, 4096);
     private static final ModConfigSpec.IntValue MAX_NODES = SERVER
             .comment("Maximum pipes visited when one endpoint discovers its network. Live.")
             .defineInRange("max_network_nodes", DEFAULT_MAX_NODES, 16, 32768);
@@ -79,6 +83,10 @@ public final class PipesConfig {
 
     public static boolean tierGating() {
         return read(TIER_GATING);
+    }
+
+    public static int paintMaxBlocks() {
+        return read(PAINT_BLOCKS);
     }
 
     public static int upgradeMaxBlocks() {

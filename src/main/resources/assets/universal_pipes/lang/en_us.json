@@ -92,5 +92,6 @@
     "gui.universal_pipes.clear": "Clear",
     "gui.universal_pipes.material.caption": "Material: click a block below",
     "gui.universal_pipes.none": "None",
-    "gui.universal_pipes.rule.hint": "Click to delete, right click to edit"
+    "gui.universal_pipes.rule.hint": "Click to delete, right click to edit",
+    "message.universal_pipes.styled": "Styled %s pipes"
 }

@@ -77,16 +77,16 @@ public final class PipeInteractions {
         ItemStack stack = event.getItemStack();
         boolean wrench = stack.is(RegistryHandler.PIPE_WRENCH.get()) || stack.is(WRENCH_TAG);
         boolean upgrade = stack.getItem() instanceof PipeUpgrade;
-        boolean dye = stack.getItem() instanceof DyeItem;
-        if (!wrench && !upgrade && !dye)
+        Player player = event.getEntity();
+        boolean restyle = restyles(stack, player);
+        if (!wrench && !upgrade && !restyle)
             return;
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
-        Player player = event.getEntity();
         if (!(level instanceof ServerLevel server) || !level.mayInteract(player, pos))
             return;
-        if (dye) {
-            tint(server, pos, player, stack);
+        if (restyle) {
+            paint(server, pos, player, stack);
         } else if (wrench) {
             if (player.isShiftKeyDown())
                 dismantle(server, pos, state, player);
@@ -98,13 +98,58 @@ public final class PipeInteractions {
         }
     }
 
-    /** Dyeing in place; it creates the block entity that carries the look and spends one dye. */
-    private static void tint(ServerLevel level, BlockPos pos, Player player, ItemStack stack) {
-        Appearance next = styled(appearanceAt(level, pos), stack);
-        if (next == null || next.equals(appearanceAt(level, pos)))
-            return;
-        PipeBlock.entityFor(level, pos).setAppearance(next);
-        consume(player, stack);
+    /**
+     * Styling needs no screen: dye, glow ink and water act on a click, and a
+     * material block needs sneaking so that placing a block against a pipe stays
+     * the default for every other block.
+     */
+    private static boolean restyles(ItemStack stack, Player player) {
+        return stack.getItem() instanceof DyeItem || stack.is(Items.GLOW_INK_SAC) || stack.is(Items.WATER_BUCKET)
+                || player.isShiftKeyDown() && stack.getItem() instanceof BlockItem block
+                        && Appearance.allowed(BuiltInRegistries.BLOCK.getKey(block.getBlock()));
+    }
+
+    /**
+     * Styles every pipe on the connected line, nearest first, up to the
+     * configured limit, and spends one item per pipe actually changed. A water
+     * bucket removes the whole look at no cost, so undoing a mistake is one click.
+     */
+    private static void paint(ServerLevel level, BlockPos start, Player player, ItemStack stack) {
+        boolean clear = stack.is(Items.WATER_BUCKET);
+        Set<BlockPos> seen = new HashSet<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        seen.add(start);
+        queue.add(start);
+        int visited = 0;
+        int changed = 0;
+        int limit = PipesConfig.paintMaxBlocks();
+        while (!queue.isEmpty() && visited < limit) {
+            BlockPos current = queue.poll();
+            visited++;
+            Appearance before = appearanceAt(level, current);
+            Appearance next = clear ? Appearance.NONE : styled(before, stack);
+            if (next != null && !next.equals(before)) {
+                if (!clear && stack.isEmpty() && !player.getAbilities().instabuild)
+                    break;
+                PipeBlock.entityFor(level, current).setAppearance(next);
+                if (clear)
+                    PipeBlock.refresh(level, current);
+                else
+                    consume(player, stack);
+                changed++;
+            }
+            BlockState state = level.getBlockState(current);
+            for (Direction face : Direction.values()) {
+                BlockPos neighbour = current.relative(face);
+                if (state.getValue(PipeBlock.FACES.get(face)) == Connection.CONNECTED
+                        && level.getBlockState(neighbour).getBlock() instanceof PipeBlock && seen.add(neighbour))
+                    queue.add(neighbour);
+            }
+        }
+        if (changed > 0)
+            level.playSound(null, start, clear ? SoundEvents.BUCKET_EMPTY : SoundEvents.DYE_USE, SoundSource.BLOCKS,
+                    SOUND_VOLUME, SOUND_PITCH);
+        player.displayClientMessage(Component.translatable("message.universal_pipes.styled", changed), true);
     }
 
     private static Appearance appearanceAt(ServerLevel level, BlockPos pos) {
