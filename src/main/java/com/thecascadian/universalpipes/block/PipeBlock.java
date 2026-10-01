@@ -1,5 +1,6 @@
 package com.thecascadian.universalpipes.block;
 
+import com.thecascadian.universalpipes.data.PipeData;
 import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
@@ -94,7 +95,7 @@ public class PipeBlock extends Block implements EntityBlock {
      * and undyed pipes form their own channel. It reuses the appearance, so
      * isolating parallel lines needs no blockstate property and no extra item.
      */
-    private static int channel(Level level, BlockPos pos) {
+    public static int channel(Level level, BlockPos pos) {
         return level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe.appearance().tint() : Appearance.UNSET;
     }
 
@@ -117,11 +118,74 @@ public class PipeBlock extends Block implements EntityBlock {
                 blocked |= PipesConfig.dyeChannels() && channel(level, pos) != channel(level, next);
                 value = blocked ? Connection.NONE : Connection.CONNECTED;
             } else {
-                value = Targets.connectable(level, pos, face) ? Connection.CONNECTED : Connection.NONE;
+                value = Targets.connectable(level, pos, face) || bridgePartner(level, pos, face) != null
+                        ? Connection.CONNECTED : Connection.NONE;
             }
             result = result.setValue(FACES.get(face), value);
         }
         return result;
+    }
+
+    /**
+     * The pipe a bridging pipe reaches across air, or null. Both ends need the
+     * bridging tier and the same channel, and every block between must be air, so
+     * a bridge can never pass through a wall or reach an inventory by accident.
+     */
+    public static BlockPos bridgePartner(Level level, BlockPos pos, Direction face) {
+        PipeData.Limits limits = PipeData.limits();
+        BlockState self = level.getBlockState(pos);
+        if (!PipesConfig.bridgingAllowed() || !(self.getBlock() instanceof PipeBlock)
+                || self.getValue(TIER) < limits.minTierBridging())
+            return null;
+        for (int distance = 1; distance <= limits.bridgeGap() + 1; distance++) {
+            BlockPos next = pos.relative(face, distance);
+            if (!level.hasChunkAt(next))
+                return null;
+            BlockState state = level.getBlockState(next);
+            if (distance > 1 && state.getBlock() instanceof PipeBlock) {
+                boolean open = state.getValue(TIER) >= limits.minTierBridging()
+                        && channel(level, pos) == channel(level, next)
+                        && !(level.getBlockEntity(next) instanceof PipeEntity other
+                                && (other.isDisabled(face.getOpposite()) || other.isExtract(face.getOpposite())));
+                return open ? next : null;
+            }
+            if (!state.isAir())
+                return null;
+        }
+        return null;
+    }
+
+    /** Whether the only thing keeping the face from joining the pipe beside it is a different dye colour. */
+    public static boolean channelGap(Level level, BlockPos pos, Direction face) {
+        BlockPos next = pos.relative(face);
+        if (!(level.getBlockState(next).getBlock() instanceof PipeBlock) || channel(level, pos) == channel(level, next))
+            return false;
+        return !(level.getBlockEntity(pos) instanceof PipeEntity self && (self.isDisabled(face) || self.isExtract(face)))
+                && !(level.getBlockEntity(next) instanceof PipeEntity other
+                        && (other.isDisabled(face.getOpposite()) || other.isExtract(face.getOpposite())));
+    }
+
+    /** A bridge changes the shape of pipes it does not touch, so the pipes in reach are told. */
+    private static void notifyBridgeNeighbours(Level level, BlockPos pos) {
+        if (level.isClientSide)
+            return;
+        int reach = PipeData.limits().bridgeGap() + 1;
+        for (Direction face : Direction.values()) {
+            for (int distance = 2; distance <= reach; distance++) {
+                BlockPos other = pos.relative(face, distance);
+                if (!level.hasChunkAt(other))
+                    break;
+                BlockState state = level.getBlockState(other);
+                if (state.getBlock() instanceof PipeBlock) {
+                    BlockState updated = computeState(level, other, state);
+                    if (updated != state)
+                        level.setBlock(other, updated, Block.UPDATE_CLIENTS);
+                    break;
+                }
+                if (!state.isAir())
+                    break;
+            }
+        }
     }
 
     @Override
@@ -132,14 +196,23 @@ public class PipeBlock extends Block implements EntityBlock {
 
     @Override
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean moved) {
-        if (!oldState.is(this))
+        if (!oldState.is(this)) {
             PipeNetworks.bump(level);
+            notifyBridgeNeighbours(level, pos);
+            if (!level.isClientSide) {
+                BlockState updated = computeState(level, pos, state);
+                if (updated != state)
+                    level.setBlock(pos, updated, Block.UPDATE_CLIENTS);
+            }
+        }
     }
 
     @Override
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
-        if (!state.is(newState.getBlock()))
+        if (!state.is(newState.getBlock())) {
             PipeNetworks.bump(level);
+            notifyBridgeNeighbours(level, pos);
+        }
         super.onRemove(state, level, pos, newState, moved);
     }
 
@@ -175,6 +248,17 @@ public class PipeBlock extends Block implements EntityBlock {
         pipe.applyComponents(stack.getComponents(), stack.getComponentsPatch());
         pipe.syncAppearance();
         refresh(level, pos);
+    }
+
+    @Override
+    protected boolean hasAnalogOutputSignal(BlockState state) {
+        return true;
+    }
+
+    /** A comparator reads the outcome of the pipe's busiest face: moving is full strength, a blocked face is weaker. */
+    @Override
+    protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof PipeEntity pipe ? pipe.signal() : 0;
     }
 
     @Override

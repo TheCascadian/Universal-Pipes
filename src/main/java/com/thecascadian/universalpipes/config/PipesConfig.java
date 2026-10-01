@@ -2,6 +2,8 @@ package com.thecascadian.universalpipes.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 /**
  * Thirteen scalars only. Everything tunable per tier or per feature lives in
  * reloadable datapack JSON instead, so servers can change it without a restart.
@@ -31,6 +33,16 @@ public final class PipesConfig {
     private static final ModConfigSpec.IntValue UPGRADE_BLOCKS = SERVER
             .comment("Maximum pipes changed by one sneak-use of a Pipe Upgrade. Live.")
             .defineInRange("network_upgrade_max_blocks", DEFAULT_UPGRADE_BLOCKS, 1, 4096);
+    private static final ModConfigSpec.BooleanValue BRIDGING = SERVER
+            .comment("Allow pipes of the bridging tier to join across a short air gap. Live.")
+            .define("allow_bridging", true);
+    private static final ModConfigSpec.BooleanValue MATERIALS = SERVER
+            .comment("Allow blocks from the materials tag to restyle pipes. Live.")
+            .define("allow_materials", true);
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> MATERIAL_BLOCKLIST = SERVER
+            .comment("Block ids that may never be used as a pipe material, on top of the datapack tag. Live.")
+            .defineListAllowEmpty("material_blocklist", () -> List.of(), () -> "minecraft:stone",
+                    value -> value instanceof String);
     private static final ModConfigSpec.BooleanValue DYE_CHANNELS = SERVER
             .comment("Pipes of different dye colours do not connect, so parallel lines can touch. Live.")
             .define("dye_channels", true);
@@ -86,6 +98,14 @@ public final class PipesConfig {
 
     public static boolean tierGating() {
         return read(TIER_GATING);
+    }
+
+    public static boolean bridgingAllowed() {
+        return read(BRIDGING);
+    }
+
+    public static boolean materialAllowed(String id) {
+        return read(MATERIALS) && !read(MATERIAL_BLOCKLIST).contains(id);
     }
 
     public static boolean dyeChannels() {

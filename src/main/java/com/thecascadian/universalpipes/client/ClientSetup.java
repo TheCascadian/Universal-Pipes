@@ -7,6 +7,7 @@ import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.item.PipeUpgrade;
 import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -56,8 +57,8 @@ public final class ClientSetup {
 
     @SubscribeEvent
     public static void onItemColors(RegisterColorHandlersEvent.Item event) {
-        event.register((stack, tintIndex) -> tint(
-                stack.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS).appearance(), tintIndex),
+        event.register((stack, tintIndex) -> tint(withMaterialColor(
+                stack.getOrDefault(RegistryHandler.SETTINGS.get(), PipeEntity.EMPTY_SETTINGS).appearance()), tintIndex),
                 RegistryHandler.PIPE_ITEM.get());
     }
 
@@ -68,6 +69,18 @@ public final class ClientSetup {
         event.getModels().replaceAll((id, model) -> id.id().getNamespace().equals(UniversalPipes.MODID)
                 && id.id().getPath().equals(PIPE_MODEL) && !id.variant().equals(INVENTORY_VARIANT)
                         ? new PipeModel(model) : model);
+    }
+
+    /**
+     * An item model cannot swap sprites, as only block models are wrapped, so an
+     * undyed pipe item carrying a material is tinted with that block's map colour.
+     * It is an approximation of the material that still tells styled items apart.
+     */
+    private static Appearance withMaterialColor(Appearance appearance) {
+        if (appearance.tint() != Appearance.UNSET || appearance.material().isEmpty())
+            return appearance;
+        return BuiltInRegistries.BLOCK.getOptional(appearance.material().get())
+                .map(block -> appearance.withTint(block.defaultMapColor().col)).orElse(appearance);
     }
 
     /**

@@ -226,7 +226,8 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         EndpointConfig.Transport transport = config.transport(tab);
         addRenderableWidget(typeCycle());
         addRenderableWidget(CycleButton.booleanBuilder(text("transfer.on"), text("transfer.off")).displayOnlyValue()
-                .withInitialValue(transport.enabled()).create(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT,
+                .withInitialValue(transport.enabled()).withTooltip(value -> Tooltip.create(throughput()))
+                .create(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT,
                         text("transfer"), (button, value) -> editTransport(t -> t.withEnabled(value))));
         addRenderableWidget(CycleButton.builder((EndpointConfig.Redstone value) -> text("redstone." + value.getSerializedName()))
                 .withValues(EndpointConfig.Redstone.values()).withInitialValue(config.redstone()).displayOnlyValue()
@@ -240,21 +241,44 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
                     edit(c -> c.withDistribution(value));
                     rebuild();
                 }));
-        addRenderableWidget(numberBox(LEFT, ROW_3, transport.keepInSource(), "keep",
-                value -> editTransport(t -> t.withKeep(value))));
-        addRenderableWidget(numberBox(RIGHT, ROW_3, transport.stopAtDestination(), "stop",
-                value -> editTransport(t -> t.withStop(value))));
+        EditBox keep = numberBox(LEFT, ROW_3, transport.keepInSource(), "keep",
+                value -> editTransport(t -> t.withKeep(value)));
+        EditBox stop = numberBox(RIGHT, ROW_3, transport.stopAtDestination(), "stop",
+                value -> editTransport(t -> t.withStop(value)));
+        keep.active = stop.active = !stockLocked();
+        addRenderableWidget(keep);
+        addRenderableWidget(stop);
         addRenderableWidget(Button.builder(text("copy"), pressed -> copy())
                 .bounds(x(LEFT), y(ROW_4), HALF_WIDTH, BUTTON_HEIGHT).build());
         addRenderableWidget(Button.builder(text("paste"), pressed -> paste())
                 .bounds(x(RIGHT), y(ROW_4), HALF_WIDTH, BUTTON_HEIGHT).build());
-        if (config.distribution() == EndpointConfig.Distribution.PRIORITY) {
+        boolean ordered = config.distribution() == EndpointConfig.Distribution.PRIORITY;
+        addRenderableWidget(CycleButton.booleanBuilder(text("channels.merge"), text("channels.own")).displayOnlyValue()
+                .withInitialValue(config.crossChannels()).withTooltip(value -> Tooltip.create(text("channels.tooltip")))
+                .create(x(LEFT), y(ROW_5), ordered ? HALF_WIDTH : FULL_WIDTH, BUTTON_HEIGHT, text("channels"),
+                        (button, value) -> edit(c -> c.withCrossChannels(value))));
+        if (ordered) {
             addRenderableWidget(Button.builder(text("order"), pressed -> {
                 picker = Picker.PRIORITY;
                 scroll = 0;
                 rebuild();
-            }).bounds(x(LEFT), y(ROW_5), FULL_WIDTH, BUTTON_HEIGHT).build());
+            }).bounds(x(RIGHT), y(ROW_5), HALF_WIDTH, BUTTON_HEIGHT).build());
         }
+    }
+
+    private Component throughput() {
+        PipeData.TierSpec spec = PipeData.tier(menu.tier());
+        return Component.translatable("gui." + UniversalPipes.MODID + ".throughput", spec.perSecond(spec.itemsPerOp()),
+                spec.perSecond(spec.fluidPerOp()), spec.energyPerSecond());
+    }
+
+    /** Whether the feature table withholds a feature from this tier; the server enforces it regardless. */
+    private boolean advancedLocked() {
+        return PipesConfig.tierGating() && menu.tier() < PipeData.limits().minTierAdvancedFilters();
+    }
+
+    private boolean stockLocked() {
+        return PipesConfig.tierGating() && menu.tier() < PipeData.limits().minTierStockLimits();
     }
 
     private EditBox numberBox(int offset, int row, int initial, String key, IntConsumer onChange) {
@@ -273,11 +297,16 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         if (tab == TransportType.ENERGY)
             return;
         FilterSet filter = config.transport(tab).filter();
-        addRenderableWidget(Button.builder(text(filter.advanced() ? "mode.advanced" : "mode.simple"), pressed -> {
+        Button mode = Button.builder(text(filter.advanced() ? "mode.advanced" : "mode.simple"), pressed -> {
             editFilter(f -> new FilterSet(!f.advanced(), f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
             selectedRule = -1;
             rebuild();
-        }).bounds(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT).build());
+        }).bounds(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT).build();
+        if (advancedLocked() && !filter.advanced()) {
+            mode.active = false;
+            mode.setTooltip(Tooltip.create(text("locked")));
+        }
+        addRenderableWidget(mode);
         if (!filter.advanced()) {
             addRenderableWidget(Button.builder(text(filter.whitelist() ? "whitelist" : "blacklist"), pressed -> {
                 editFilter(f -> new FilterSet(f.advanced(), !f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
@@ -285,7 +314,9 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
             }).bounds(x(LEFT), y(ROW_2), FULL_WIDTH, BUTTON_HEIGHT).build());
             return;
         }
-        addRenderableWidget(Button.builder(text(filter.firstMatch() ? "first_match" : "all_match"), pressed -> {
+        Component match = text(filter.firstMatch() ? "first_match" : "all_match").copy().append(" "
+                + filter.rules().size() + "/" + PipeData.tier(menu.tier()).maxRules());
+        addRenderableWidget(Button.builder(match, pressed -> {
             editFilter(f -> new FilterSet(f.advanced(), f.whitelist(), f.entries(), !f.firstMatch(), f.rules()));
             rebuild();
         }).bounds(x(LEFT), y(ROW_2), FULL_WIDTH, BUTTON_HEIGHT).build());

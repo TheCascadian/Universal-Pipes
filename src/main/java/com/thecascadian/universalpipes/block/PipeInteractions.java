@@ -5,7 +5,9 @@ import com.thecascadian.universalpipes.config.PipesConfig;
 import com.thecascadian.universalpipes.core.Appearance;
 import com.thecascadian.universalpipes.core.EndpointConfig;
 import com.thecascadian.universalpipes.core.PipeNetworks;
+import com.thecascadian.universalpipes.core.Status;
 import com.thecascadian.universalpipes.core.Targets;
+import com.thecascadian.universalpipes.data.PipeData;
 import com.thecascadian.universalpipes.item.PipeUpgrade;
 import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.core.BlockPos;
@@ -19,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
@@ -41,6 +44,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -59,6 +63,7 @@ public final class PipeInteractions {
             ResourceLocation.fromNamespaceAndPath("c", "tools/wrench"));
     private static final int BREAK_EFFECT = 2001;
     private static final int ANVIL_COST = 1;
+    private static final Direction CLIPBOARD_FACE = Direction.UP;
     private static final int PARTICLE_COUNT = 3;
     private static final int PARTICLE_LIMIT = 16;
     private static final double PARTICLE_SPREAD = 0.25;
@@ -80,20 +85,26 @@ public final class PipeInteractions {
         boolean upgrade = stack.getItem() instanceof PipeUpgrade;
         Player player = event.getEntity();
         boolean restyle = restyles(stack, player);
-        if (!wrench && !upgrade && !restyle)
+        boolean inspect = stack.isEmpty() && player.isShiftKeyDown() && event.getHand() == InteractionHand.MAIN_HAND;
+        if (!wrench && !upgrade && !restyle && !inspect)
             return;
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
         if (!(level instanceof ServerLevel server) || !level.mayInteract(player, pos))
             return;
-        if (restyle) {
+        if (inspect) {
+            inspect(server, pos, player);
+        } else if (restyle) {
             paint(server, pos, player, stack);
         } else if (wrench) {
-            if (player.isShiftKeyDown())
-                dismantle(server, pos, state, player);
+            Direction face = PipeBlock.faceAt(state, pos, event.getHitVec().getLocation(),
+                    event.getHitVec().getDirection());
+            if (!player.isShiftKeyDown())
+                cycle(server, pos, face, stack);
+            else if (level.getBlockEntity(pos) instanceof PipeEntity pipe && pipe.isExtract(face))
+                copy(player, stack, pipe.config(face));
             else
-                cycle(server, pos, PipeBlock.faceAt(state, pos, event.getHitVec().getLocation(),
-                        event.getHitVec().getDirection()));
+                dismantle(server, pos, state, player);
         } else {
             upgrade(server, pos, player, stack, player.isShiftKeyDown());
         }
@@ -208,7 +219,7 @@ public final class PipeInteractions {
     }
 
     /** Connected, then disconnected, then extract, then connected again. */
-    private static void cycle(ServerLevel level, BlockPos pos, Direction face) {
+    private static void cycle(ServerLevel level, BlockPos pos, Direction face, ItemStack wrench) {
         PipeEntity pipe = PipeBlock.entityFor(level, pos);
         if (pipe.isExtract(face)) {
             pipe.setExtract(face, null);
@@ -216,12 +227,52 @@ public final class PipeInteractions {
             pipe.setDisabled(face, false);
             boolean pipeNeighbour = level.getBlockState(pos.relative(face)).getBlock() instanceof PipeBlock;
             if (!pipeNeighbour && Targets.connectable(level, pos, face))
-                pipe.setExtract(face, EndpointConfig.fromDefaults());
+                pipe.setExtract(face, copied(wrench, pipe.tier()));
         } else {
             pipe.setDisabled(face, true);
         }
         PipeBlock.refresh(level, pos);
         level.playSound(null, pos, SoundEvents.COPPER_PLACE, SoundSource.BLOCKS, SOUND_VOLUME, SOUND_PITCH);
+    }
+
+    /**
+     * Copied settings ride on the wrench in the existing settings component, so no
+     * item or component type is added. The component is a map by face, and the
+     * copy always uses one fixed face as its slot.
+     */
+    private static void copy(Player player, ItemStack wrench, EndpointConfig config) {
+        wrench.set(RegistryHandler.SETTINGS.get(),
+                new PipeEntity.Settings(0, Map.of(CLIPBOARD_FACE, config), Appearance.NONE));
+        player.displayClientMessage(Component.translatable("message.universal_pipes.copied"), true);
+    }
+
+    /** A new endpoint starts from the copied settings when the wrench holds some, and from the defaults otherwise. */
+    private static EndpointConfig copied(ItemStack wrench, int tier) {
+        PipeEntity.Settings held = wrench.get(RegistryHandler.SETTINGS.get());
+        EndpointConfig config = held == null ? null : held.faces().get(CLIPBOARD_FACE);
+        return config == null ? EndpointConfig.fromDefaults() : config.sanitize(tier);
+    }
+
+    /** Pipe count, endpoints, the weakest tier and the state of the first active face, as one line. */
+    private static void inspect(ServerLevel level, BlockPos start, Player player) {
+        List<BlockPos> line = line(level, start, PipesConfig.maxNetworkNodes());
+        int endpoints = 0;
+        int weakest = PipeData.TIER_COUNT;
+        Status shown = Status.IDLE;
+        for (BlockPos pos : line) {
+            weakest = Math.min(weakest, level.getBlockState(pos).getValue(PipeBlock.TIER));
+            if (!(level.getBlockEntity(pos) instanceof PipeEntity pipe))
+                continue;
+            for (Direction face : Direction.values()) {
+                if (!pipe.isExtract(face))
+                    continue;
+                endpoints++;
+                if (shown == Status.IDLE)
+                    shown = pipe.status(face);
+            }
+        }
+        player.displayClientMessage(Component.translatable("message.universal_pipes.inspect", line.size(), endpoints,
+                weakest, Component.translatable(shown.translationKey())), true);
     }
 
     private static void dismantle(ServerLevel level, BlockPos pos, BlockState state, Player player) {

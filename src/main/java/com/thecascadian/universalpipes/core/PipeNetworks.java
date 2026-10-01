@@ -138,11 +138,22 @@ public final class PipeNetworks {
      * loads or forces a chunk and an unloaded destination is simply absent
      * until a later topology change finds it.
      */
-    public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch) {
-        return discover(level, start, sourceFace, epoch, PipesConfig.maxNetworkNodes());
+    public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch,
+            boolean crossChannels) {
+        return discover(level, start, sourceFace, epoch, PipesConfig.maxNetworkNodes(), crossChannels);
     }
 
     public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch, int max) {
+        return discover(level, start, sourceFace, epoch, max, false);
+    }
+
+    /**
+     * A face reaches a pipe next to it, a pipe across a bridge, or, when the
+     * endpoint chose to cross channels, a pipe of another dye colour that the
+     * connection rule left unjoined.
+     */
+    public static Topology discover(ServerLevel level, BlockPos start, Direction sourceFace, long epoch, int max,
+            boolean crossChannels) {
         Long2IntOpenHashMap distance = new Long2IntOpenHashMap();
         distance.defaultReturnValue(-1);
         LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
@@ -163,9 +174,15 @@ public final class PipeNetworks {
                 continue;
             int depth = distance.get(packed);
             for (Direction face : Direction.values()) {
-                if (state.getValue(PipeBlock.FACES.get(face)) != Connection.CONNECTED)
+                boolean joined = state.getValue(PipeBlock.FACES.get(face)) == Connection.CONNECTED;
+                if (!joined && !(crossChannels && PipeBlock.channelGap(level, pipePos, face)))
                     continue;
                 BlockPos next = pipePos.relative(face);
+                if (joined && level.getBlockState(next).isAir()) {
+                    BlockPos far = PipeBlock.bridgePartner(level, pipePos, face);
+                    if (far != null)
+                        next = far;
+                }
                 if (!level.hasChunkAt(next)) {
                     unloaded = true;
                     continue;
