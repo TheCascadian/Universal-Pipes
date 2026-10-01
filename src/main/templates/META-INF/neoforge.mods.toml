@@ -1,12 +1,14 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
+issueTrackerURL="https://github.com/TheCascadian/Universal-Pipes/issues"
 
 [[mods]]
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
+displayURL="https://github.com/TheCascadian/Universal-Pipes"
 description='''I built Universal Pipes as a single configurable pipe for items, fluids and energy, with upgradeable tiers, per-endpoint filters and distribution modes, and a network model that keeps passive pipes free of block entities and ticking.'''
 
 [[dependencies.${mod_id}]]
@@ -20,5 +22,19 @@ side="BOTH"
 modId="minecraft"
 type="required"
 versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="jei"
+type="optional"
+versionRange="[19,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.${mod_id}]]
+modId="patchouli"
+type="optional"
+versionRange="[1.21,)"
 ordering="NONE"
 side="BOTH"

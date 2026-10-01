@@ -1,6 +1,7 @@
 package com.thecascadian.universalpipes.item;
 
 import com.thecascadian.universalpipes.registry.RegistryHandler;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -14,6 +15,11 @@ public class PipeUpgrade extends Item {
 
     public static int tierOf(ItemStack stack) {
         return stack.getOrDefault(RegistryHandler.TIER_COMPONENT.get(), DEFAULT_TIER);
+    }
+
+    @Override
+    public Component getName(ItemStack stack) {
+        return Component.translatable("item.universal_pipes.pipe_upgrade.tiered", tierOf(stack));
     }
 
     public static ItemStack create(int tier) {

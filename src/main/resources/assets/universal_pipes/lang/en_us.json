@@ -2,6 +2,8 @@
     "block.universal_pipes.pipe": "Pipe",
     "item.universal_pipes.pipe_wrench": "Pipe Wrench",
     "item.universal_pipes.pipe_upgrade": "Pipe Upgrade",
+    "item.universal_pipes.pipe_upgrade.tiered": "Tier %s Pipe Upgrade",
+    "block.universal_pipes.pipe.tiered": "Tier %s Pipe",
     "itemGroup.universal_pipes": "Universal Pipes",
     "message.universal_pipes.cannot_upgrade": "This pipe cannot take that upgrade",
     "gui.universal_pipes.tab.items": "Items",
@@ -145,5 +147,9 @@
     "universal_pipes.configuration.section.universal.pipes.server": "Server",
     "universal_pipes.configuration.section.universal.pipes.server.title": "Universal Pipes Server Configuration",
     "universal_pipes.configuration.section.universal.pipes.client": "Client",
-    "universal_pipes.configuration.section.universal.pipes.client.title": "Universal Pipes Client Configuration"
+    "universal_pipes.configuration.section.universal.pipes.client.title": "Universal Pipes Client Configuration",
+    "jei.universal_pipes.info.pipe": "Connects to any block that exposes an item, fluid or energy capability. Use a Pipe Wrench on a connected face to cycle it between connected, disconnected and extract. Right click a pipe with an empty hand to open its screen.",
+    "jei.universal_pipes.info.wrench": "Click a pipe face to cycle connection modes. Sneak and click an extract face to copy its settings. Sneak and click anything else to dismantle the pipe. Any item in the c:tools/wrench tag works too.",
+    "jei.universal_pipes.info.upgrade": "Right click a pipe to raise its tier by one. Sneak while clicking to upgrade the connected line, up to the configured limit. Higher tiers move more per operation and unlock more filter slots, rules and bridging.",
+    "jei.universal_pipes.info.upgrade.tier": "Raises a pipe to tier %s."
 }

@@ -14,6 +14,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.SoundType;
@@ -48,7 +49,15 @@ public final class RegistryHandler {
     public static final DeferredBlock<PipeBlock> PIPE = BLOCKS.register("pipe",
             () -> new PipeBlock(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(PIPE_HARDNESS,
                     PIPE_RESISTANCE).sound(SoundType.COPPER).noOcclusion().requiresCorrectToolForDrops()));
-    public static final DeferredItem<BlockItem> PIPE_ITEM = ITEMS.registerSimpleBlockItem("pipe", PIPE);
+    public static final DeferredItem<BlockItem> PIPE_ITEM = ITEMS.register("pipe",
+            () -> new BlockItem(PIPE.get(), new Item.Properties()) {
+                @Override
+                public Component getName(ItemStack stack) {
+                    int tier = stack.getOrDefault(TIER_COMPONENT.get(), 1);
+                    return tier <= 1 ? super.getName(stack)
+                            : Component.translatable("block.universal_pipes.pipe.tiered", tier);
+                }
+            });
     public static final DeferredItem<Item> PIPE_WRENCH = ITEMS.register("pipe_wrench",
             () -> new Item(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<PipeUpgrade> PIPE_UPGRADE = ITEMS.register("pipe_upgrade",

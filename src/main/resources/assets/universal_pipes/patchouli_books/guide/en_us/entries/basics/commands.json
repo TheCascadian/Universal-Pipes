@@ -1,0 +1,16 @@
+{
+    "name": "Commands and Config",
+    "icon": "minecraft:command_block",
+    "category": "universal_pipes:basics",
+    "sortnum": 6,
+    "pages": [
+        {
+            "type": "patchouli:text",
+            "text": "$(thing)/upipes stats$() lists endpoints and cost per tick per dimension.$(br)$(thing)/upipes profile [n]$() lists the slowest faces.$(br)$(thing)/upipes rebuild$() forces network rediscovery."
+        },
+        {
+            "type": "patchouli:text",
+            "text": "Limits, tick budget, bridging, styling and tier rules are in the mod configuration screen. Per-tier values and the tier feature table are datapack files under $(thing)universal_pipes/universal_pipes$()."
+        }
+    ]
+}

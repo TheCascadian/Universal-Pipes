@@ -1,0 +1,26 @@
+{
+    "name": "Getting Started",
+    "icon": "universal_pipes:pipe",
+    "category": "universal_pipes:basics",
+    "sortnum": 0,
+    "pages": [
+        {
+            "type": "patchouli:text",
+            "text": "Craft eight $(item)Pipes$() from two rows of iron ingots with a gap between them. Craft a $(item)Pipe Wrench$() from iron ingots too."
+        },
+        {
+            "type": "patchouli:crafting",
+            "recipe": "universal_pipes:pipe",
+            "text": "Pipes."
+        },
+        {
+            "type": "patchouli:crafting",
+            "recipe": "universal_pipes:pipe_wrench",
+            "text": "The wrench."
+        },
+        {
+            "type": "patchouli:text",
+            "text": "Pipes join each other automatically. A pipe also reaches any adjacent block that exposes an item, fluid or energy capability, but only once that face is set to $(thing)extract$().$(br2)Use the wrench on a face to cycle it: connected, disconnected, extract."
+        }
+    ]
+}

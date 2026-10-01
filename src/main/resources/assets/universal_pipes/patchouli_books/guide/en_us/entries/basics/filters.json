@@ -1,0 +1,16 @@
+{
+    "name": "Filters",
+    "icon": "minecraft:hopper",
+    "category": "universal_pipes:basics",
+    "sortnum": 4,
+    "pages": [
+        {
+            "type": "patchouli:text",
+            "text": "The Filters view offers a simple mode with filter slots and a whitelist or blacklist, and an advanced mode with an ordered rule list.$(br2)Each rule allows or denies matching units, can be limited to chosen targets, and can cap the amount per operation."
+        },
+        {
+            "type": "patchouli:text",
+            "text": "Rules use expressions:$(br)$(thing)minecraft:stone$() an id$(br)$(thing)#minecraft:logs$() a tag$(br)$(thing)@create$() a namespace$(br)$(thing)~sword$() part of a name$(br)$(thing)?enchanted$(br)?damaged$()$(br2)Combine with $(thing)& | !$() and brackets."
+        }
+    ]
+}
