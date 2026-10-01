@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PipeModel extends BakedModelWrapper<BakedModel> {
 
-    private static final int STRIDE = DefaultVertexFormat.BLOCK.getIntegerSize();
+    private static final int STRIDE = DefaultVertexFormat.BLOCK.getVertexSize() / Integer.BYTES;
     private static final int U_OFFSET = 4;
     private static final int V_OFFSET = 5;
     private static final Map<ResourceLocation, TextureAtlasSprite> SPRITES = new ConcurrentHashMap<>();

@@ -174,7 +174,8 @@ public class PipeEntity extends BlockEntity {
             return;
         Appearance.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get(APPEARANCE_KEY)).result()
                 .ifPresent(parsed -> appearance = parsed);
-        requestModelDataRefresh();
+        if (level != null && level.getModelDataManager() != null)
+            level.getModelDataManager().requestRefresh(this);
     }
 
     public EndpointConfig config(Direction face) {
