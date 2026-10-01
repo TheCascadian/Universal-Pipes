@@ -1,0 +1,44 @@
+{
+    "tiers": [
+        {
+            "items_per_operation": 1,
+            "interval_ticks": 4,
+            "fluid_mb_per_operation": 50,
+            "energy_per_tick": 128,
+            "filter_slots": 3,
+            "max_rules": 2
+        },
+        {
+            "items_per_operation": 4,
+            "interval_ticks": 4,
+            "fluid_mb_per_operation": 200,
+            "energy_per_tick": 512,
+            "filter_slots": 5,
+            "max_rules": 4
+        },
+        {
+            "items_per_operation": 16,
+            "interval_ticks": 2,
+            "fluid_mb_per_operation": 800,
+            "energy_per_tick": 2048,
+            "filter_slots": 7,
+            "max_rules": 8
+        },
+        {
+            "items_per_operation": 32,
+            "interval_ticks": 1,
+            "fluid_mb_per_operation": 2000,
+            "energy_per_tick": 8192,
+            "filter_slots": 9,
+            "max_rules": 16
+        },
+        {
+            "items_per_operation": 64,
+            "interval_ticks": 1,
+            "fluid_mb_per_operation": 8000,
+            "energy_per_tick": 32768,
+            "filter_slots": 9,
+            "max_rules": 32
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+    "max_expression_length": 128,
+    "max_expression_depth": 6,
+    "max_scope_targets": 16,
+    "max_stock": 1000000,
+    "min_tier": {
+        "fluids": 1,
+        "energy": 1,
+        "advanced_filters": 1,
+        "stock_limits": 1
+    }
+}
