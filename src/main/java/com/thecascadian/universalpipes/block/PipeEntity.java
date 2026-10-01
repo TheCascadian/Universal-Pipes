@@ -121,6 +121,33 @@ public class PipeEntity extends BlockEntity {
         return faces.containsKey(face);
     }
 
+    public EndpointConfig config(Direction face) {
+        return faces.get(face);
+    }
+
+    public void setExtract(Direction face, EndpointConfig config) {
+        if (config == null) {
+            faces.remove(face);
+            runtimes.remove(face);
+        } else {
+            faces.put(face, config);
+        }
+        changed();
+    }
+
+    /** Applies a validated configuration and wakes the face so the change acts at once. */
+    public void updateConfig(Direction face, EndpointConfig config) {
+        if (!faces.containsKey(face))
+            return;
+        faces.put(face, config);
+        Runtime runtime = runtimes.get(face);
+        if (runtime != null) {
+            runtime.ordered = null;
+            runtime.nextRun = 0L;
+        }
+        setChanged();
+    }
+
     public boolean isEmptyState() {
         return disabledMask == 0 && faces.isEmpty() && appearance.equals(Appearance.NONE);
     }
