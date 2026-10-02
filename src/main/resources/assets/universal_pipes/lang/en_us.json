@@ -111,6 +111,8 @@
     "message.universal_pipes.inspect": "%1$s pipes, %2$s endpoints, weakest tier %3$s, %4$s",
     "universal_pipes.configuration.entity_targets_enabled": "Entity Targets",
     "universal_pipes.configuration.entity_targets_enabled.tooltip": "Allow pipes to use entities that expose item, fluid or energy capabilities as targets.",
+    "universal_pipes.configuration.advanced_filters": "Advanced Filters",
+    "universal_pipes.configuration.advanced_filters.tooltip": "Show the advanced rule-based filter mode. Off by default.",
     "universal_pipes.configuration.tier_feature_gating": "Tier Feature Gating",
     "universal_pipes.configuration.tier_feature_gating.tooltip": "Require the minimum tiers from the feature table in the datapack.",
     "universal_pipes.configuration.network_upgrade_max_blocks": "Upgrade Line Limit",

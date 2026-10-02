@@ -349,7 +349,7 @@ public class PipeEntity extends BlockEntity {
 
     private void process(ServerLevel level, Direction face, EndpointConfig config, Runtime runtime, long now) {
         PipeData.TierSpec spec = PipeData.tier(tier());
-        config = PipesConfig.tierGating() ? config.gated(tier()) : config;
+        config = PipesConfig.tierGating() || !PipesConfig.advancedFilters() ? config.gated(tier()) : config;
         if (level.getServer().getAverageTickTimeNanos() / NANOS_PER_MILLI > PipesConfig.tickBudgetMs()) {
             idle(runtime, now, spec, Status.BUDGET_DEFERRED);
             return;

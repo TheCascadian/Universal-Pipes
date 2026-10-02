@@ -6,6 +6,8 @@
 
 A single configurable pipe block that moves items, fluids and energy between adjacent inventories, with five upgradeable tiers and per-face filters.
 
+![Universal Pipes lines in the world](docs/images/hero.png)
+
 ## Features
 
 - One pipe block for items, fluids and energy. Each extraction face enables the transport types it needs.
@@ -27,9 +29,11 @@ A single configurable pipe block that moves items, fluids and energy between adj
 
 Requirements: Minecraft 1.21.1 and NeoForge 21.1.219 or newer (NeoForge version range as built from `gradle.properties`). Java 21.
 
-Place the mod jar in the `mods` folder of the client and of the server. The mod has no other dependencies. No recipe viewer integration is included.
+Place the mod jar in the `mods` folder of the client and of the server. The mod has no other dependencies. JEI is supported if installed, and is optional.
 
 ## Quick start
+
+![Chest, pipe and chest](docs/images/quickstart-setup.png)
 
 1. Craft pipes. Eight iron ingots in two rows of three (gap in the middle row) give eight pipes. Craft a Pipe Wrench from iron ingots as shown in the recipe table.
 2. Place a chest, then a line of pipes, then a second chest, so the pipes touch both chests. Pipes connect to adjacent blocks that expose an item, fluid or energy capability.
@@ -55,6 +59,8 @@ There is no crafting recipe for the tier 5 upgrade. It is available from the cre
 
 ## Tiers
 
+![The five tiers: steel, copper, gold, dark and purple](docs/images/tiers-in-world.png)
+
 Values come from the bundled `tiers.json`. Per-second rates are the per-operation amount multiplied by 20 and divided by the interval in ticks. Energy is stated per tick and multiplied by 20.
 
 | Tier | Items per op | Interval (ticks) | Items/s | Fluid mB per op | mB/s | FE/tick | FE/s | Filter slots | Max rules |
@@ -68,6 +74,8 @@ Values come from the bundled `tiers.json`. Per-second rates are the per-operatio
 Upgrades may skip tiers unless `allow_tier_skipping` is off. With `tier_feature_gating` on, fluids, energy, advanced filters and stock limits need the minimum tier set in `limits.json`. Bridging always needs its minimum tier (default 4).
 
 ## Filters
+
+![The simple filter view](docs/images/screen-filters-simple.png)
 
 Each transport type on an extract face has its own filter. Energy has no filter. A filter with nothing in its active list allows everything.
 
@@ -123,11 +131,16 @@ Fluids use the same grammar. `?enchanted`, `?damaged` and `?durability` never ma
 
 ## Configuration
 
+Dye channels let parallel lines of different colours touch without joining:
+
+![Parallel dyed lines](docs/images/dye-channels.png)
+
 Server options are in `universal_pipes-server.toml` (per world), the client option in `universal_pipes-client.toml`. All options except `command_permission_level` take effect live.
 
 | Option | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `entity_targets_enabled` | `false` | | Allow entities that expose item, fluid or energy capabilities as targets. |
+| `advanced_filters` | `false` | | Show and allow the advanced rule-based filter mode. Simple filters are always available. |
 | `tier_feature_gating` | `false` | | Require the minimum tiers from the feature table in `limits.json`. |
 | `network_upgrade_max_blocks` | `64` | 1 to 4096 | Maximum pipes changed by one sneak-use of a Pipe Upgrade. |
 | `allow_bridging` | `true` | | Allow pipes of the bridging tier to join across a short air gap. |

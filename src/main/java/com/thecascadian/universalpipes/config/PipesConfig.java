@@ -30,6 +30,9 @@ public final class PipesConfig {
     private static final ModConfigSpec.BooleanValue TIER_GATING = SERVER
             .comment("Require the minimum tiers from the feature table in the datapack. Live.")
             .define("tier_feature_gating", false);
+    private static final ModConfigSpec.BooleanValue ADVANCED_FILTERS = SERVER
+            .comment("Show and allow the advanced rule-based filter mode. Off by default; the simple filter is always available. Live.")
+            .define("advanced_filters", false);
     private static final ModConfigSpec.IntValue UPGRADE_BLOCKS = SERVER
             .comment("Maximum pipes changed by one sneak-use of a Pipe Upgrade. Live.")
             .defineInRange("network_upgrade_max_blocks", DEFAULT_UPGRADE_BLOCKS, 1, 4096);
@@ -101,6 +104,10 @@ public final class PipesConfig {
 
     public static boolean entityTargets() {
         return read(ENTITY_TARGETS);
+    }
+
+    public static boolean advancedFilters() {
+        return read(ADVANCED_FILTERS);
     }
 
     public static boolean tierGating() {

@@ -123,16 +123,25 @@ public final class PipeInteractions {
 
     /**
      * Styles every pipe on the connected line, nearest first, up to the
-     * configured limit, and spends one item per pipe actually changed. A water
+     * configured limit. A line with one entry and one exit is styled uniformly,
+     * walking from the entry and giving every pipe the entry's look, and spends one item per pipe actually changed. A water
      * bucket removes the whole look at no cost, so undoing a mistake is one click.
      */
     private static void paint(ServerLevel level, BlockPos start, Player player, ItemStack stack) {
         boolean clear = stack.is(Items.WATER_BUCKET);
-        List<BlockPos> line = line(level, start, PipesConfig.paintMaxBlocks());
+        List<BlockPos> line = line(level, start, PipesConfig.maxNetworkNodes());
+        BlockPos entry = soleEntry(level, line);
+        Appearance uniform = null;
+        if (entry != null) {
+            line = line(level, entry, PipesConfig.paintMaxBlocks());
+            uniform = clear ? Appearance.NONE : styled(appearanceAt(level, entry), stack);
+        } else {
+            line = line(level, start, PipesConfig.paintMaxBlocks());
+        }
         int changed = 0;
         for (BlockPos current : line) {
             Appearance before = appearanceAt(level, current);
-            Appearance next = clear ? Appearance.NONE : styled(before, stack);
+            Appearance next = uniform != null ? uniform : clear ? Appearance.NONE : styled(before, stack);
             if (next == null || next.equals(before))
                 continue;
             if (!clear && stack.isEmpty() && !player.getAbilities().instabuild)
@@ -148,6 +157,53 @@ public final class PipeInteractions {
             level.playSound(null, start, clear ? SoundEvents.BUCKET_EMPTY : SoundEvents.DYE_USE, SoundSource.BLOCKS,
                     SOUND_VOLUME, SOUND_PITCH);
         player.displayClientMessage(Component.translatable("message.universal_pipes.styled", changed), true);
+    }
+
+    /**
+     * Keeps a line with one entry and one exit looking like its entry, texture
+     * included. Called when a pipe is placed or an extract face changes, so a line
+     * stays uniform without repainting. Costs nothing and does nothing for any
+     * other kind of line.
+     */
+    static void harmonise(ServerLevel level, BlockPos pos) {
+        List<BlockPos> line = line(level, pos, PipesConfig.maxNetworkNodes());
+        BlockPos entry = soleEntry(level, line);
+        if (entry == null)
+            return;
+        Appearance look = appearanceAt(level, entry);
+        for (BlockPos current : line) {
+            if (appearanceAt(level, current).equals(look))
+                continue;
+            PipeBlock.entityFor(level, current).setAppearance(look);
+            PipeBlock.refresh(level, current);
+        }
+    }
+
+    /**
+     * The entry pipe when the line has exactly one entry (an extract face) and one
+     * exit (any other endpoint face), otherwise null. Such a line is styled as a
+     * whole from its entry, so every pipe ends up with the entry's look.
+     */
+    private static BlockPos soleEntry(ServerLevel level, List<BlockPos> line) {
+        BlockPos entry = null;
+        int entries = 0;
+        int exits = 0;
+        for (BlockPos pos : line) {
+            if (!(level.getBlockEntity(pos) instanceof PipeEntity pipe))
+                continue;
+            BlockState state = level.getBlockState(pos);
+            for (Direction face : Direction.values()) {
+                if (state.getValue(PipeBlock.FACES.get(face)) != Connection.ENDPOINT)
+                    continue;
+                if (pipe.isExtract(face)) {
+                    entries++;
+                    entry = pos;
+                } else {
+                    exits++;
+                }
+            }
+        }
+        return entries == 1 && exits == 1 ? entry : null;
     }
 
     /**
@@ -232,6 +288,7 @@ public final class PipeInteractions {
             pipe.setDisabled(face, true);
         }
         PipeBlock.refresh(level, pos);
+        harmonise(level, pos);
         level.playSound(null, pos, SoundEvents.COPPER_PLACE, SoundSource.BLOCKS, SOUND_VOLUME, SOUND_PITCH);
     }
 
@@ -335,6 +392,8 @@ public final class PipeInteractions {
         if (!(state.getBlock() instanceof PipeBlock) || !canUpgrade(state.getValue(PipeBlock.TIER), target))
             return false;
         level.setBlock(pos, state.setValue(PipeBlock.TIER, target), Block.UPDATE_ALL);
+        PipeBlock.refresh(level, pos);
+        PipeBlock.notifyBridgeNeighbours(level, pos);
         PipeNetworks.bump(level);
         if (particlesSoFar < PARTICLE_LIMIT) {
             level.sendParticles(ParticleTypes.HAPPY_VILLAGER, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,

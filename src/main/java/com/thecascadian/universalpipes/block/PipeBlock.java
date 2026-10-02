@@ -12,6 +12,7 @@ import com.thecascadian.universalpipes.registry.RegistryHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -166,7 +167,7 @@ public class PipeBlock extends Block implements EntityBlock {
     }
 
     /** A bridge changes the shape of pipes it does not touch, so the pipes in reach are told. */
-    private static void notifyBridgeNeighbours(Level level, BlockPos pos) {
+    static void notifyBridgeNeighbours(Level level, BlockPos pos) {
         if (level.isClientSide)
             return;
         int reach = PipeData.limits().bridgeGap() + 1;
@@ -242,12 +243,15 @@ public class PipeBlock extends Block implements EntityBlock {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        if (level.isClientSide || !stack.has(RegistryHandler.SETTINGS.get()))
+        if (!(level instanceof ServerLevel server))
             return;
-        PipeEntity pipe = entityFor(level, pos);
-        pipe.applyComponents(stack.getComponents(), stack.getComponentsPatch());
-        pipe.syncAppearance();
-        refresh(level, pos);
+        if (stack.has(RegistryHandler.SETTINGS.get())) {
+            PipeEntity pipe = entityFor(level, pos);
+            pipe.applyComponents(stack.getComponents(), stack.getComponentsPatch());
+            pipe.syncAppearance();
+            refresh(level, pos);
+        }
+        PipeInteractions.harmonise(server, pos);
     }
 
     @Override

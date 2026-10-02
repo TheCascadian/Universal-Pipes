@@ -2,6 +2,7 @@ package com.thecascadian.universalpipes.core;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.thecascadian.universalpipes.config.PipesConfig;
 import com.thecascadian.universalpipes.data.PipeData;
 import com.thecascadian.universalpipes.filter.Expr;
 import com.thecascadian.universalpipes.filter.FilterSet;
@@ -183,7 +184,8 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
      */
     public EndpointConfig gated(int tier) {
         PipeData.Limits limits = PipeData.limits();
-        boolean advanced = tier >= limits.minTierAdvancedFilters();
+        boolean advanced = PipesConfig.advancedFilters()
+                && (!PipesConfig.tierGating() || tier >= limits.minTierAdvancedFilters());
         boolean stock = tier >= limits.minTierStockLimits();
         return new EndpointConfig(redstone, distribution, priority, gated(items, advanced, stock),
                 gated(fluids, advanced, stock), gated(energy, advanced, stock), crossChannels);
@@ -231,7 +233,8 @@ public record EndpointConfig(Redstone redstone, Distribution distribution, List<
             rules.add(new FilterSet.Rule(expression, rule.allow(), scope, clamp(rule.limit(), limits.maxStock()),
                     rule.enabled()));
         }
-        return new FilterSet(filter.advanced(), filter.whitelist(), entries, filter.firstMatch(), rules);
+        return new FilterSet(filter.advanced() && PipesConfig.advancedFilters(), filter.whitelist(), entries,
+                filter.firstMatch(), rules);
     }
 
     private static int clamp(int value, int ceiling) {

@@ -15,6 +15,7 @@ import com.thecascadian.universalpipes.filter.FilterSet;
 import com.thecascadian.universalpipes.menu.PipeMenu;
 import com.thecascadian.universalpipes.net.Payloads;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -297,17 +298,18 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         if (tab == TransportType.ENERGY)
             return;
         FilterSet filter = config.transport(tab).filter();
-        Button mode = Button.builder(text(filter.advanced() ? "mode.advanced" : "mode.simple"), pressed -> {
+        Button mode = Button.builder(text(advancedOn(filter) ? "mode.advanced" : "mode.simple"), pressed -> {
             editFilter(f -> new FilterSet(!f.advanced(), f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
             selectedRule = -1;
             rebuild();
         }).bounds(x(RIGHT), y(ROW_1), HALF_WIDTH, BUTTON_HEIGHT).build();
-        if (advancedLocked() && !filter.advanced()) {
+        if (advancedLocked() && !advancedOn(filter)) {
             mode.active = false;
             mode.setTooltip(Tooltip.create(text("locked")));
         }
-        addRenderableWidget(mode);
-        if (!filter.advanced()) {
+        if (PipesConfig.advancedFilters())
+            addRenderableWidget(mode);
+        if (!advancedOn(filter)) {
             addRenderableWidget(Button.builder(text(filter.whitelist() ? "whitelist" : "blacklist"), pressed -> {
                 editFilter(f -> new FilterSet(f.advanced(), !f.whitelist(), f.entries(), f.firstMatch(), f.rules()));
                 rebuild();
@@ -480,14 +482,19 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
     }
 
+    /** Advanced mode only shows while the option is on, whatever an old configuration still says. */
+    private static boolean advancedOn(FilterSet filter) {
+        return filter.advanced() && PipesConfig.advancedFilters();
+    }
+
     private boolean simpleFilterShown() {
         return view == View.FILTERS && picker == Picker.NONE && tab != TransportType.ENERGY
-                && !config.transport(tab).filter().advanced();
+                && !advancedOn(config.transport(tab).filter());
     }
 
     private boolean advancedFilterShown() {
         return view == View.FILTERS && picker == Picker.NONE && tab != TransportType.ENERGY
-                && config.transport(tab).filter().advanced();
+                && advancedOn(config.transport(tab).filter());
     }
 
     /**
@@ -512,7 +519,7 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
         if (id == null)
             return false;
         FilterSet filter = config.transport(tab).filter();
-        if (filter.advanced()) {
+        if (advancedOn(filter)) {
             if (filter.rules().stream().noneMatch(rule -> rule.expression().equals(id)))
                 addRule(id);
             return true;
@@ -550,8 +557,16 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button))
-            return true;
+        // The container screen's own handler claims every click, so widgets are tried first and the
+        // filter and look areas are handled before it can swallow the click.
+        for (GuiEventListener child : children()) {
+            if (child.mouseClicked(mouseX, mouseY, button)) {
+                setFocused(child);
+                if (button == 0)
+                    setDragging(true);
+                return true;
+            }
+        }
         if (picker != Picker.NONE)
             return clickDestination(mouseX, mouseY);
         if (view == View.LOOK && clickSwatch(mouseX, mouseY))
@@ -560,7 +575,9 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
             return true;
         if (advancedFilterShown() && clickRuleRow(mouseX, mouseY, button))
             return true;
-        return inPanel(mouseX, mouseY) && absorb(menu.getCarried());
+        if (inPanel(mouseX, mouseY) && absorb(menu.getCarried()))
+            return true;
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private int ghostX(int index) {
