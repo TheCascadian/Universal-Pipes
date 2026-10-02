@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/banner.png" alt="Universal Pipes" width="720"></p>
+
 # Universal Pipes
 
 ![Minecraft 1.21.1](https://img.shields.io/badge/Minecraft-1.21.1-blue)
