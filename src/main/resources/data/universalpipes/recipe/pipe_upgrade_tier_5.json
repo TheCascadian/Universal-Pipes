@@ -1,0 +1,23 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": [
+        " I ",
+        "IRI",
+        " I "
+    ],
+    "key": {
+        "I": {
+            "tag": "c:storage_blocks/netherite"
+        },
+        "R": {
+            "item": "minecraft:nether_star"
+        }
+    },
+    "result": {
+        "id": "universalpipes:pipe_upgrade",
+        "components": {
+            "universalpipes:tier": 5
+        }
+    }
+}

@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * Reloadable tuning data. Three JSON files are read from
- * data/&lt;namespace&gt;/universal_pipes/: tiers, defaults and limits. A file from
+ * data/&lt;namespace&gt;/universalpipes/: tiers, defaults and limits. A file from
  * a namespace other than this mod's wins over the bundled one. Every value is
  * clamped on load, and a missing value falls back to the built-in default, so a
  * partial or malformed file can never produce an unusable tier.
@@ -28,7 +28,7 @@ public final class PipeData extends SimpleJsonResourceReloadListener {
 
     public static final int TIER_COUNT = 5;
     private static final Gson GSON = new GsonBuilder().create();
-    private static final String DIRECTORY = "universal_pipes";
+    private static final String DIRECTORY = "universalpipes";
     private static final String TIERS = "tiers";
     private static final String DEFAULTS = "defaults";
     private static final String LIMITS = "limits";

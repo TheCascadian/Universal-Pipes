@@ -56,7 +56,7 @@ public final class RegistryHandler {
                 public Component getName(ItemStack stack) {
                     int tier = stack.getOrDefault(TIER_COMPONENT.get(), 1);
                     return tier <= 1 ? super.getName(stack)
-                            : Component.translatable("block.universal_pipes.pipe.tiered", tier);
+                            : Component.translatable("block.universalpipes.pipe.tiered", tier);
                 }
             });
     public static final DeferredItem<Item> PIPE_WRENCH = ITEMS.register("pipe_wrench",
@@ -81,7 +81,7 @@ public final class RegistryHandler {
             () -> IMenuTypeExtension.create(PipeMenu::new));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register("main",
-            () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.universal_pipes"))
+            () -> CreativeModeTab.builder().title(Component.translatable("itemGroup.universalpipes"))
                     .icon(() -> PIPE_ITEM.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
                         output.accept(PIPE_ITEM.get());

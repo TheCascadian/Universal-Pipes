@@ -139,7 +139,7 @@ Dye channels let parallel lines of different colours touch without joining:
 
 ![Parallel dyed lines](docs/images/dye-channels.png)
 
-Server options are in `universal_pipes-server.toml` (per world), the client option in `universal_pipes-client.toml`. All options except `command_permission_level` take effect live.
+Server options are in `universalpipes-server.toml` (per world), the client option in `universalpipes-client.toml`. All options except `command_permission_level` take effect live.
 
 | Option | Default | Range | Meaning |
 | --- | --- | --- | --- |
@@ -164,7 +164,7 @@ Server options are in `universal_pipes-server.toml` (per world), the client opti
 
 ### Datapack
 
-Three JSON files are read from `data/<namespace>/universal_pipes/` and reload with `/reload`. A file from a namespace other than `universal_pipes` replaces the bundled one. Every value is clamped on load and a missing value falls back to the built-in default.
+Three JSON files are read from `data/<namespace>/universalpipes/` and reload with `/reload`. A file from a namespace other than `universalpipes` replaces the bundled one. Every value is clamped on load and a missing value falls back to the built-in default.
 
 `tiers.json` holds an array `tiers` of five objects, in tier order, with these keys and clamps: `items_per_operation` (1 to 4096), `interval_ticks` (1 to 1200), `fluid_mb_per_operation` (1 to 1000000), `energy_per_tick` (1 to 100000000), `filter_slots` (0 to 9), `max_rules` (0 to 64).
 
@@ -176,10 +176,10 @@ Tags:
 
 | Tag | Type | Effect |
 | --- | --- | --- |
-| `universal_pipes:non_connectable` | block | Pipes never connect to these blocks. |
-| `universal_pipes:non_transferable` | item | These items are never moved. |
-| `universal_pipes:non_transferable` | fluid | These fluids are never moved. |
-| `universal_pipes:materials` | block | Blocks that may restyle a pipe as a material. |
+| `universalpipes:non_connectable` | block | Pipes never connect to these blocks. |
+| `universalpipes:non_transferable` | item | These items are never moved. |
+| `universalpipes:non_transferable` | fluid | These fluids are never moved. |
+| `universalpipes:materials` | block | Blocks that may restyle a pipe as a material. |
 
 ## Commands
 

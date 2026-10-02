@@ -1,7 +1,0 @@
-{
-    "parent": "universal_pipes:block/pipe_item",
-    "textures": {
-        "pipe": "universal_pipes:block/pipe_tier_2",
-        "particle": "universal_pipes:block/pipe_tier_2"
-    }
-}

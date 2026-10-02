@@ -1,0 +1,26 @@
+{
+    "parent": "minecraft:item/handheld",
+    "textures": {
+        "layer0": "universalpipes:item/pipe_upgrade"
+    },
+    "overrides": [
+        {
+            "predicate": {
+                "universalpipes:tier": 0.6
+            },
+            "model": "universalpipes:item/pipe_upgrade_3"
+        },
+        {
+            "predicate": {
+                "universalpipes:tier": 0.8
+            },
+            "model": "universalpipes:item/pipe_upgrade_4"
+        },
+        {
+            "predicate": {
+                "universalpipes:tier": 1.0
+            },
+            "model": "universalpipes:item/pipe_upgrade_5"
+        }
+    ]
+}

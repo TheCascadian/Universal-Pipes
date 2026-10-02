@@ -801,7 +801,7 @@ public class PipeScreen extends AbstractContainerScreen<PipeMenu> {
             graphics.drawString(font, text("energy.nofilter"), LEFT, ROW_2 + TEXT_DROP, SECONDARY, false);
         } else if (simpleFilterShown()) {
             graphics.drawString(font, text("hint.add"), LEFT, ROW_3 + TEXT_DROP, SECONDARY, false);
-            graphics.drawString(font, Component.translatable("gui.universal_pipes.count",
+            graphics.drawString(font, Component.translatable("gui.universalpipes.count",
                     config.transport(tab).filter().entries().size(), PipeData.tier(menu.tier()).filterSlots()), LEFT,
                     ROW_5 + TEXT_DROP, SECONDARY, false);
         }

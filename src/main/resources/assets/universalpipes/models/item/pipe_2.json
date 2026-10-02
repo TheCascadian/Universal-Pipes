@@ -1,0 +1,7 @@
+{
+    "parent": "universalpipes:block/pipe_item",
+    "textures": {
+        "pipe": "universalpipes:block/pipe_tier_2",
+        "particle": "universalpipes:block/pipe_tier_2"
+    }
+}

@@ -55,13 +55,13 @@ public class UniversalPipesJei implements IModPlugin {
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
         registration.addIngredientInfo(RegistryHandler.PIPE_ITEM.get().getDefaultInstance(), VanillaTypes.ITEM_STACK,
-                Component.translatable("jei.universal_pipes.info.pipe"));
+                Component.translatable("jei.universalpipes.info.pipe"));
         registration.addIngredientInfo(RegistryHandler.PIPE_WRENCH.get().getDefaultInstance(),
-                VanillaTypes.ITEM_STACK, Component.translatable("jei.universal_pipes.info.wrench"));
+                VanillaTypes.ITEM_STACK, Component.translatable("jei.universalpipes.info.wrench"));
         List<ItemStack> upgrades = new ArrayList<>();
         for (int tier = PipeUpgrade.DEFAULT_TIER; tier <= PipeBlock.MAX_TIER; tier++)
             upgrades.add(PipeUpgrade.create(tier));
         registration.addIngredientInfo(upgrades, VanillaTypes.ITEM_STACK,
-                Component.translatable("jei.universal_pipes.info.upgrade"));
+                Component.translatable("jei.universalpipes.info.upgrade"));
     }
 }

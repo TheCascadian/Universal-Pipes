@@ -19,7 +19,7 @@ public class PipeUpgrade extends Item {
 
     @Override
     public Component getName(ItemStack stack) {
-        return Component.translatable("item.universal_pipes.pipe_upgrade.tiered", tierOf(stack));
+        return Component.translatable("item.universalpipes.pipe_upgrade.tiered", tierOf(stack));
     }
 
     public static ItemStack create(int tier) {

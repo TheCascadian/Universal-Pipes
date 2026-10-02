@@ -156,7 +156,7 @@ public final class PipeInteractions {
         if (changed > 0)
             level.playSound(null, start, clear ? SoundEvents.BUCKET_EMPTY : SoundEvents.DYE_USE, SoundSource.BLOCKS,
                     SOUND_VOLUME, SOUND_PITCH);
-        player.displayClientMessage(Component.translatable("message.universal_pipes.styled", changed), true);
+        player.displayClientMessage(Component.translatable("message.universalpipes.styled", changed), true);
     }
 
     /**
@@ -300,7 +300,7 @@ public final class PipeInteractions {
     private static void copy(Player player, ItemStack wrench, EndpointConfig config) {
         wrench.set(RegistryHandler.SETTINGS.get(),
                 new PipeEntity.Settings(0, Map.of(CLIPBOARD_FACE, config), Appearance.NONE));
-        player.displayClientMessage(Component.translatable("message.universal_pipes.copied"), true);
+        player.displayClientMessage(Component.translatable("message.universalpipes.copied"), true);
     }
 
     /** A new endpoint starts from the copied settings when the wrench holds some, and from the defaults otherwise. */
@@ -328,7 +328,7 @@ public final class PipeInteractions {
                     shown = pipe.status(face);
             }
         }
-        player.displayClientMessage(Component.translatable("message.universal_pipes.inspect", line.size(), endpoints,
+        player.displayClientMessage(Component.translatable("message.universalpipes.inspect", line.size(), endpoints,
                 weakest, Component.translatable(shown.translationKey())), true);
     }
 
@@ -357,7 +357,7 @@ public final class PipeInteractions {
             if (applyUpgrade(level, pos, target, 0))
                 consume(player, stack);
             else
-                player.displayClientMessage(Component.translatable("message.universal_pipes.cannot_upgrade"), true);
+                player.displayClientMessage(Component.translatable("message.universalpipes.cannot_upgrade"), true);
             return;
         }
         Set<BlockPos> seen = new HashSet<>();
@@ -383,7 +383,7 @@ public final class PipeInteractions {
             }
         }
         if (upgraded == 0)
-            player.displayClientMessage(Component.translatable("message.universal_pipes.cannot_upgrade"), true);
+            player.displayClientMessage(Component.translatable("message.universalpipes.cannot_upgrade"), true);
     }
 
     /** The block entity is untouched because only the tier property changes. */

@@ -109,7 +109,7 @@ public class PipeMenu extends AbstractContainerMenu {
         };
         player.openMenu(
                 new SimpleMenuProvider((id, inventory, unused) -> new PipeMenu(id, inventory, pipe.getBlockPos(), face,
-                        pipe.tier(), config, pipe.appearance(), shown, pipe, data), Component.translatable("block.universal_pipes.pipe")),
+                        pipe.tier(), config, pipe.appearance(), shown, pipe, data), Component.translatable("block.universalpipes.pipe")),
                 buf -> {
                     buf.writeBlockPos(pipe.getBlockPos());
                     buf.writeEnum(face);

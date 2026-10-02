@@ -1,0 +1,82 @@
+{
+    "textures": {
+        "pipe": "universalpipes:block/pipe_tier_1",
+        "particle": "universalpipes:block/pipe_tier_1"
+    },
+    "elements": [
+        {
+            "from": [
+                11,
+                5,
+                5
+            ],
+            "to": [
+                16,
+                11,
+                11
+            ],
+            "faces": {
+                "north": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        6,
+                        7
+                    ]
+                },
+                "south": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        6,
+                        7
+                    ]
+                },
+                "east": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        7,
+                        7
+                    ]
+                },
+                "west": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        7,
+                        7
+                    ]
+                },
+                "up": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        6,
+                        7
+                    ]
+                },
+                "down": {
+                    "texture": "#pipe",
+                    "tintindex": 0,
+                    "uv": [
+                        1,
+                        1,
+                        6,
+                        7
+                    ]
+                }
+            }
+        }
+    ]
+}

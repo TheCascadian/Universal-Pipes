@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 @Mod(UniversalPipes.MODID)
 public class UniversalPipes {
 
-    public static final String MODID = "universal_pipes";
+    public static final String MODID = "universalpipes";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public UniversalPipes(IEventBus modBus, ModContainer container) {
