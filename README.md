@@ -45,7 +45,9 @@ Other wrench actions: sneak and use it on an extract face to copy that face's se
 
 ## Recipes
 
-Ingot ingredients are item tags, so any mod's ingot of the same kind works.
+Ingot ingredients are item tags, so any mod's ingot of the same kind works. The in-game guide book shows these same recipes on its first pages.
+
+![The Recipes chapter of the in-game guide book](docs/images/guide-recipes.png)
 
 | Result | Pattern (rows) | Ingredients |
 | --- | --- | --- |
@@ -54,8 +56,8 @@ Ingot ingredients are item tags, so any mod's ingot of the same kind works.
 | Pipe Upgrade, tier 2 | ` I `, `IRI`, ` I ` | I = `c:ingots/copper`, R = redstone |
 | Pipe Upgrade, tier 3 | ` I `, `IRI`, ` I ` | I = `c:ingots/gold`, R = redstone |
 | Pipe Upgrade, tier 4 | ` I `, `IRI`, ` I ` | I = `c:ingots/netherite`, R = redstone |
-
-There is no crafting recipe for the tier 5 upgrade. It is available from the creative tab, or with `/give @s universal_pipes:pipe_upgrade[universal_pipes:tier=5]`.
+| Pipe Upgrade, tier 5 | ` B `, `BSB`, ` B ` | B = `c:storage_blocks/netherite`, S = nether star |
+| Guide Book | shapeless | book, `c:ingots/iron` |
 
 ## Tiers
 

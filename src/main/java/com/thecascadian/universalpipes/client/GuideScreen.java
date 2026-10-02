@@ -23,6 +23,9 @@ public class GuideScreen extends Screen {
     private static final int LINE_HEIGHT = 10;
     private static final int PAGE_LINES = 15;
 
+    private static final int SLOT = 18;
+    private static final int SLOT_EDGE = 0xFF8C6B3F;
+    private static final int SLOT_FILL = 0xFFC9B88F;
     private static final int PAPER = 0xFFE9DCBC;
     private static final int PAPER_EDGE = 0xFF8C6B3F;
     private static final int LIST_BG = 0xFF5B4327;
@@ -30,6 +33,7 @@ public class GuideScreen extends Screen {
 
     private final List<GuideContent.Chapter> chapters;
     private List<List<FormattedCharSequence>> pages = List.of();
+    private int textPages;
     private int chapter;
     private int page;
     private Button previous;
@@ -86,6 +90,9 @@ public class GuideScreen extends Screen {
         }
         if (result.isEmpty())
             result.add(List.of());
+        textPages = result.size();
+        for (int i = 0; i < chapters.get(chapter).recipes().size(); i++)
+            result.add(List.of());
         pages = result;
     }
 
@@ -110,6 +117,45 @@ public class GuideScreen extends Screen {
         return true;
     }
 
+    /** A crafting grid, an arrow and the result, with the caption wrapped underneath. */
+    private void drawRecipe(GuiGraphics graphics, GuideContent.Recipe recipe, int x, int y, int mouseX, int mouseY) {
+        graphics.drawString(font, recipe.name().copy().withStyle(net.minecraft.ChatFormatting.DARK_RED,
+                net.minecraft.ChatFormatting.BOLD), x, y, TEXT, false);
+        int gridX = x + 6;
+        int gridY = y + 20;
+        net.minecraft.world.item.ItemStack hovered = net.minecraft.world.item.ItemStack.EMPTY;
+        for (int cell = 0; cell < 9; cell++) {
+            int cx = gridX + cell % 3 * SLOT;
+            int cy = gridY + cell / 3 * SLOT;
+            graphics.fill(cx, cy, cx + SLOT, cy + SLOT, SLOT_EDGE);
+            graphics.fill(cx + 1, cy + 1, cx + SLOT - 1, cy + SLOT - 1, SLOT_FILL);
+            net.minecraft.world.item.ItemStack stack = recipe.grid().get(cell);
+            if (stack.isEmpty())
+                continue;
+            graphics.renderItem(stack, cx + 1, cy + 1);
+            if (mouseX >= cx && mouseX < cx + SLOT && mouseY >= cy && mouseY < cy + SLOT)
+                hovered = stack;
+        }
+        int arrowX = gridX + 3 * SLOT + 8;
+        int arrowY = gridY + SLOT + 5;
+        graphics.drawString(font, "->", arrowX, arrowY, TEXT, false);
+        int rx = arrowX + 22;
+        int ry = gridY + SLOT;
+        graphics.fill(rx - 2, ry - 2, rx + 20, ry + 20, SLOT_EDGE);
+        graphics.fill(rx - 1, ry - 1, rx + 19, ry + 19, SLOT_FILL);
+        graphics.renderItem(recipe.result(), rx + 1, ry + 1);
+        graphics.renderItemDecorations(font, recipe.result(), rx + 1, ry + 1);
+        if (mouseX >= rx - 2 && mouseX < rx + 20 && mouseY >= ry - 2 && mouseY < ry + 20)
+            hovered = recipe.result();
+        int textY = gridY + 3 * SLOT + 8;
+        for (FormattedCharSequence line : font.split(recipe.caption(), WIDTH - LIST_WIDTH - 24)) {
+            graphics.drawString(font, line, x, textY, TEXT, false);
+            textY += LINE_HEIGHT;
+        }
+        if (!hovered.isEmpty())
+            graphics.renderTooltip(font, hovered, mouseX, mouseY);
+    }
+
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.renderBackground(graphics, mouseX, mouseY, partialTick);
@@ -126,6 +172,8 @@ public class GuideScreen extends Screen {
             graphics.drawString(font, line, textX, y, TEXT, false);
             y += LINE_HEIGHT;
         }
+        if (page >= textPages)
+            drawRecipe(graphics, chapters.get(chapter).recipes().get(page - textPages), textX, top + 8, mouseX, mouseY);
 
         Component counter = Component.literal((page + 1) + " / " + pages.size());
         graphics.drawString(font, counter, left + LIST_WIDTH + (WIDTH - LIST_WIDTH) / 2 - font.width(counter) / 2,
