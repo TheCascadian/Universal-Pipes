@@ -11,3 +11,9 @@ run*/
 
 .settings/
 
+
+# Not part of the mod
+.claude/
+tools/
+docs/*
+!docs/images/
